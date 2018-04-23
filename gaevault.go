@@ -35,7 +35,7 @@ func (k KMSInfo) name() string {
 func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string]interface{}, error) {
 	// grab KMS client
 	ks, err := cloudkms.New(oauth2.NewClient(ctx,
-		google.AppEngineTokenSource(ctx, cloudkms.CloudPlatformScope)))
+		google.AppEngineTokenSource(ctx, "https://www.googleapis.com/auth/cloudkms")))
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init KMS client")
 	}
