@@ -21,13 +21,15 @@ type VaultInfo struct {
 }
 
 type KMSInfo struct {
-	ProjectID string
-	Locations string
-	Name      string
+	ProjectID   string
+	Locations   string
+	KeyRingID   string
+	CryptoKeyID string
 }
 
-func (k KMSInfo) fullName() string {
-	return "projects/" + k.ProjectID + "/locations/" + k.Locations + "/" + k.Name
+func (k KMSInfo) name() string {
+	return "projects/" + k.ProjectID + "/locations/" + k.Locations + "/keyRings/#" +
+		k.KeyRingID + "/cryptoKeys/#" + k.CryptoKeyID
 }
 
 func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string]interface{}, error) {
@@ -40,7 +42,7 @@ func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string
 	kmsClient := cloudkms.NewProjectsLocationsKeyRingsCryptoKeysService(ks)
 
 	// decrypt our vault secret
-	res, err := kmsClient.Decrypt(kInfo.fullName(),
+	res, err := kmsClient.Decrypt(kInfo.name(),
 		&cloudkms.DecryptRequest{Ciphertext: vInfo.EncryptedSecretID}).Context(ctx).Do()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to decrypt secret ID via KMS")
