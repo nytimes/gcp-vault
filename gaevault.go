@@ -55,10 +55,9 @@ func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
-	vlogic := vClient.Logical()
 
 	// 'login' to vault
-	_, err = vlogic.Write(vInfo.LoginPath, map[string]interface{}{
+	_, err = vClient.Logical().Write(vInfo.LoginPath, map[string]interface{}{
 		"role_id": vInfo.RoleID, "secret_id": res.Plaintext,
 	})
 	if err != nil {
@@ -66,7 +65,7 @@ func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string
 	}
 
 	// fetch secrets
-	secrets, err := vlogic.Read(vInfo.SecretPath)
+	secrets, err := vClient.Logical().Read(vInfo.SecretPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
