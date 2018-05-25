@@ -2,11 +2,13 @@ package gaevault
 
 import (
 	"context"
+	"io/ioutil"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
 
 	cloudkms "google.golang.org/api/cloudkms/v1"
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/urlfetch"
 
 	"golang.org/x/oauth2"
@@ -33,6 +35,9 @@ func (k KMSInfo) name() string {
 }
 
 func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string]interface{}, error) {
+	if appengine.IsDevAppServer() {
+		return getLocalSecrets(ctx, vInfo)
+	}
 	// grab KMS client
 	ks, err := cloudkms.New(oauth2.NewClient(ctx,
 		google.AppEngineTokenSource(ctx, "https://www.googleapis.com/auth/cloudkms")))
@@ -59,6 +64,38 @@ func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string
 	// 'login' to vault
 	_, err = vClient.Logical().Write(vInfo.LoginPath, map[string]interface{}{
 		"role_id": vInfo.RoleID, "secret_id": res.Plaintext,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to login to vault")
+	}
+
+	// fetch secrets
+	secrets, err := vClient.Logical().Read(vInfo.SecretPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get secrets")
+	}
+
+	return secrets.Data, nil
+}
+
+func getLocalSecrets(ctx context.Context, vInfo VaultInfo) (map[string]interface{}, error) {
+	// init vault client
+	vcfg := api.DefaultConfig()
+	vcfg.HttpClient = urlfetch.Client(ctx)
+	vClient, err := api.NewClient(vcfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to init vault client")
+	}
+
+	// read github PAT
+	token, err := ioutil.ReadFile("~/.config/vault/github")
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to read github PAT")
+	}
+
+	// 'login' to vault
+	_, err = vClient.Logical().Write(vInfo.LoginPath, map[string]interface{}{
+		"token": string(token),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
