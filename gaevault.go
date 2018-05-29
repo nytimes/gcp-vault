@@ -2,7 +2,7 @@ package gaevault
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
@@ -87,19 +87,7 @@ func getLocalSecrets(ctx context.Context, vInfo VaultInfo) (map[string]interface
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
-	// read github PAT
-	token, err := ioutil.ReadFile("~/.config/vault/github")
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to read github PAT")
-	}
-
-	// 'login' to vault
-	_, err = vClient.Logical().Write(vInfo.LoginPath, map[string]interface{}{
-		"token": string(token),
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to login to vault")
-	}
+	vClient.SetToken(os.Getenv("VAULT_LOCAL_TOKEN"))
 
 	// fetch secrets
 	secrets, err := vClient.Logical().Read(vInfo.SecretPath)
