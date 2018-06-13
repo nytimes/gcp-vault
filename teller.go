@@ -10,13 +10,12 @@ type Teller struct {
 	secrets map[string]interface{}
 	once    sync.Once
 
-	k KMSInfo
-	v VaultInfo
+	sPath, iamRole string
 }
 
 // NewTeller will return a Teller instance to fetch secrets just one time.
-func NewTeller(k KMSInfo, v VaultInfo) *Teller {
-	return &Teller{k: k, v: v}
+func NewTeller(iamRole, secretPath string) *Teller {
+	return &Teller{iamRole: iamRole, sPath: secretPath}
 }
 
 // Tell will get user secrets. If they have already been fetched, Vault will not be
@@ -24,7 +23,7 @@ func NewTeller(k KMSInfo, v VaultInfo) *Teller {
 func (t *Teller) Tell(ctx context.Context) (map[string]interface{}, error) {
 	var err error
 	t.once.Do(func() {
-		t.secrets, err = GetSecrets(ctx, t.k, t.v)
+		t.secrets, err = GetSecrets(ctx, t.iamRole, t.sPath)
 	})
 	return t.secrets, err
 }

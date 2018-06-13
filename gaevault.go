@@ -2,55 +2,29 @@ package gaevault
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
 
-	cloudkms "google.golang.org/api/cloudkms/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/urlfetch"
-
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
-type VaultInfo struct {
-	RoleID            string
-	EncryptedSecretID string
-	LoginPath         string
-	SecretPath        string
-}
-
-type KMSInfo struct {
-	ProjectID   string
-	Locations   string
-	KeyRingID   string
-	CryptoKeyID string
-}
-
-func (k KMSInfo) name() string {
-	return "projects/" + k.ProjectID + "/locations/" + k.Locations + "/keyRings/#" +
-		k.KeyRingID + "/cryptoKeys/#" + k.CryptoKeyID
-}
-
-func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string]interface{}, error) {
+func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]interface{}, error) {
 	if appengine.IsDevAppServer() {
-		return getLocalSecrets(ctx, vInfo)
+		return getLocalSecrets(ctx, secretPath)
 	}
-	// grab KMS client
-	ks, err := cloudkms.New(oauth2.NewClient(ctx,
-		google.AppEngineTokenSource(ctx, "https://www.googleapis.com/auth/cloudkms")))
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to init KMS client")
-	}
-	kmsClient := cloudkms.NewProjectsLocationsKeyRingsCryptoKeysService(ks)
 
-	// decrypt our vault secret
-	res, err := kmsClient.Decrypt(kInfo.name(),
-		&cloudkms.DecryptRequest{Ciphertext: vInfo.EncryptedSecretID}).Context(ctx).Do()
+	// create signed JWT with our service account
+	jwt, err := newJWT(ctx, iamRole)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to decrypt secret ID via KMS")
+		return nil, errors.Wrap(err, "unable to create JWT")
 	}
 
 	// init vault client
@@ -62,15 +36,15 @@ func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string
 	}
 
 	// 'login' to vault
-	_, err = vClient.Logical().Write(vInfo.LoginPath, map[string]interface{}{
-		"role_id": vInfo.RoleID, "secret_id": res.Plaintext,
+	_, err = vClient.Logical().Write("auth/gcp/login", map[string]interface{}{
+		"role": iamRole, "jwt": jwt,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
 	}
 
 	// fetch secrets
-	secrets, err := vClient.Logical().Read(vInfo.SecretPath)
+	secrets, err := vClient.Logical().Read(secretPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
@@ -78,7 +52,7 @@ func GetSecrets(ctx context.Context, kInfo KMSInfo, vInfo VaultInfo) (map[string
 	return secrets.Data, nil
 }
 
-func getLocalSecrets(ctx context.Context, vInfo VaultInfo) (map[string]interface{}, error) {
+func getLocalSecrets(ctx context.Context, secretPath string) (map[string]interface{}, error) {
 	// init vault client
 	vcfg := api.DefaultConfig()
 	vcfg.HttpClient = urlfetch.Client(ctx)
@@ -90,10 +64,48 @@ func getLocalSecrets(ctx context.Context, vInfo VaultInfo) (map[string]interface
 	vClient.SetToken(os.Getenv("VAULT_LOCAL_TOKEN"))
 
 	// fetch secrets
-	secrets, err := vClient.Logical().Read(vInfo.SecretPath)
+	secrets, err := vClient.Logical().Read(secretPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
 
 	return secrets.Data, nil
+}
+
+// created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
+// and be signed with GAE service acct
+func newJWT(ctx context.Context, iamRole string) (string, error) {
+	svc, err := appengine.ServiceAccount(ctx)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to find service account")
+	}
+
+	h := map[string]string{"alg": "RS256", "typ": "JWT"}
+	p := map[string]string{
+		"sub": svc,
+		"aud": "vault/" + iamRole,
+		"exp": strconv.FormatInt(time.Now().UTC().Add(15*time.Minute).Unix(), 10),
+	}
+	encode := func(i map[string]string) (string, error) {
+		b, err := json.Marshal(i)
+		if err != nil {
+			return "", err
+		}
+		return base64.RawURLEncoding.EncodeToString(b), nil
+	}
+	header, err := encode(h)
+	if err != nil {
+		return "", err
+	}
+	payload, err := encode(p)
+	if err != nil {
+		return "", err
+	}
+
+	ss := fmt.Sprintf("%s.%s", header, payload)
+	_, sig, err := appengine.SignBytes(ctx, []byte(ss))
+	if err != nil {
+		return "", errors.Wrap(err, "unable to sign JWT")
+	}
+	return fmt.Sprintf("%s.%s", ss, base64.RawURLEncoding.EncodeToString(sig)), nil
 }
