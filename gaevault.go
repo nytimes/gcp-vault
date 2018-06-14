@@ -2,22 +2,27 @@ package gaevault
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+
 	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
 
+	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/urlfetch"
 )
 
 func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]interface{}, error) {
 	if appengine.IsDevAppServer() {
+		log.Debugf(ctx, "getting local secrets")
 		return getLocalSecrets(ctx, secretPath)
 	}
 
@@ -73,39 +78,34 @@ func getLocalSecrets(ctx context.Context, secretPath string) (map[string]interfa
 }
 
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
-// and be signed with GAE service acct
 func newJWT(ctx context.Context, iamRole string) (string, error) {
-	svc, err := appengine.ServiceAccount(ctx)
+	serviceAccount, err := appengine.ServiceAccount(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to find service account")
 	}
 
-	h := map[string]string{"alg": "RS256", "typ": "JWT"}
-	p := map[string]string{
-		"sub": svc,
+	payload, err := json.Marshal(map[string]string{
 		"aud": "vault/" + iamRole,
-		"exp": strconv.FormatInt(time.Now().UTC().Add(15*time.Minute).Unix(), 10),
-	}
-	encode := func(i map[string]string) (string, error) {
-		b, err := json.Marshal(i)
-		if err != nil {
-			return "", err
-		}
-		return base64.RawURLEncoding.EncodeToString(b), nil
-	}
-	header, err := encode(h)
+		"sub": serviceAccount,
+		"exp": strconv.FormatInt(time.Now().UTC().Add(5*time.Minute).Unix(), 10),
+	})
 	if err != nil {
-		return "", err
-	}
-	payload, err := encode(p)
-	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "unable to encode payload")
 	}
 
-	ss := fmt.Sprintf("%s.%s", header, payload)
-	_, sig, err := appengine.SignBytes(ctx, []byte(ss))
+	iamClient, err := iam.New(oauth2.NewClient(ctx,
+		google.AppEngineTokenSource(ctx, iam.CloudPlatformScope)))
+	if err != nil {
+		return "", errors.Wrap(err, "unable to init IAM client")
+	}
+
+	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
+		fmt.Sprintf("projects/%s/serviceAccounts/%s",
+			appengine.AppID(ctx), serviceAccount),
+		&iam.SignJwtRequest{Payload: string(payload)}).Context(ctx).Do()
 	if err != nil {
 		return "", errors.Wrap(err, "unable to sign JWT")
 	}
-	return fmt.Sprintf("%s.%s", ss, base64.RawURLEncoding.EncodeToString(sig)), nil
+
+	return resp.SignedJwt, nil
 }
