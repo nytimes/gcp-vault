@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -41,12 +40,14 @@ func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]int
 	}
 
 	// 'login' to vault
-	_, err = vClient.Logical().Write("auth/gcp/login", map[string]interface{}{
+	resp, err := vClient.Logical().Write("auth/gcp/login", map[string]interface{}{
 		"role": iamRole, "jwt": jwt,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
 	}
+
+	vClient.SetToken(resp.Auth.ClientToken)
 
 	// fetch secrets
 	secrets, err := vClient.Logical().Read(secretPath)
@@ -84,10 +85,10 @@ func newJWT(ctx context.Context, iamRole string) (string, error) {
 		return "", errors.Wrap(err, "unable to find service account")
 	}
 
-	payload, err := json.Marshal(map[string]string{
+	payload, err := json.Marshal(map[string]interface{}{
 		"aud": "vault/" + iamRole,
 		"sub": serviceAccount,
-		"exp": strconv.FormatInt(time.Now().UTC().Add(5*time.Minute).Unix(), 10),
+		"exp": time.Now().UTC().Add(5 * time.Minute).Unix(),
 	})
 	if err != nil {
 		return "", errors.Wrap(err, "unable to encode payload")
