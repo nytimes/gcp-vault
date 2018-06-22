@@ -10,8 +10,10 @@ type TellFunc func(context.Context, map[string]interface{}) error
 
 // Teller is a mechanism to lazily fetch secrets from Vault.
 type Teller struct {
+	secrets map[string]interface{}
+	secOnce sync.Once
+
 	tellFunc TellFunc
-	tellOnce sync.Once
 
 	sPath, iamRole string
 }
@@ -38,13 +40,11 @@ func NewTeller(iamRole, secretPath string, tellFunc TellFunc) *Teller {
 // users.
 func (t *Teller) Tell(ctx context.Context) error {
 	var err error
-	t.tellOnce.Do(func() {
-		var secrets map[string]interface{}
-		secrets, err = GetSecrets(ctx, t.iamRole, t.sPath)
+	t.secOnce.Do(func() {
+		t.secrets, err = GetSecrets(ctx, t.iamRole, t.sPath)
 		if err != nil {
 			return
 		}
-		err = t.tellFunc(ctx, secrets)
 	})
-	return err
+	return t.tellFunc(ctx, t.secrets)
 }
