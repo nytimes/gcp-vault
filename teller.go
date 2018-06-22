@@ -20,6 +20,13 @@ type Teller struct {
 // iamRole is the name of the Vault role given to your service account when configuring
 // GCP and Vault. secretPath is the path of the secrets we wish to fetch from Vault
 // with our IAM role.
+//
+// Under the hood this is using the Vault API client to log in, so make sure you inject
+// the appropriate 'VAULT_*' environment variables like VAULT_ADDR.
+//
+// If running in a local development environment (via 'goapp test' or dev_appserver.py)
+// this will look for a VAULT_LOCAL_TOKEN environment variable, which should contain
+// the oken obtained after logging into Vault via the CLI tool.
 func NewTeller(iamRole, secretPath string, tellFunc TellFunc) *Teller {
 	return &Teller{iamRole: iamRole, sPath: secretPath}
 }
