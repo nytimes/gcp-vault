@@ -5,25 +5,39 @@ import (
 	"sync"
 )
 
-// Teller is a mechanism to cache secrets from Vault.
+// TellFunc will be provided by users to receive secrets from the Teller.
+type TellFunc func(context.Context, map[string]interface{}) error
+
+// Teller is a mechanism to lazily fetch secrets from Vault.
 type Teller struct {
-	secrets map[string]interface{}
-	once    sync.Once
+	tellFunc TellFunc
+	tellOnce sync.Once
 
 	sPath, iamRole string
 }
 
 // NewTeller will return a Teller instance to fetch secrets just one time.
-func NewTeller(iamRole, secretPath string) *Teller {
+// iamRole is the name of the Vault role given to your service account when configuring
+// GCP and Vault. secretPath is the path of the secrets we wish to fetch from Vault
+// with our IAM role.
+func NewTeller(iamRole, secretPath string, tellFunc TellFunc) *Teller {
 	return &Teller{iamRole: iamRole, sPath: secretPath}
 }
 
-// Tell will get user secrets. If they have already been fetched, Vault will not be
-// contacted again.
-func (t *Teller) Tell(ctx context.Context) (map[string]interface{}, error) {
+// Tell will get secrets from Vault and call the given TellFunc with them. If they have
+// already been fetched, Vault will not be contacted again.
+// Users will likely want to put this method call in their service middleware and enable
+// warm up requests in hopes of fetching the secrets before exposing the service to
+// users.
+func (t *Teller) Tell(ctx context.Context) error {
 	var err error
-	t.once.Do(func() {
-		t.secrets, err = GetSecrets(ctx, t.iamRole, t.sPath)
+	t.tellOnce.Do(func() {
+		var secrets map[string]interface{}
+		secrets, err = GetSecrets(ctx, t.iamRole, t.sPath)
+		if err != nil {
+			return
+		}
+		err = t.tellFunc(ctx, secrets)
 	})
-	return t.secrets, err
+	return err
 }

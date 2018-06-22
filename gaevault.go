@@ -19,6 +19,14 @@ import (
 	"google.golang.org/appengine/urlfetch"
 )
 
+// GetSecrets allows users to access Vault directly without the Teller layer.
+// iamRole is the name of the Vault role given to your service account when configuring
+// GCP and Vault. secretPath is the path of the secrets we wish to fetch from Vault
+// with our IAM role.
+//
+// If running in a local development environment (via 'goapp test' or dev_appserver.py)
+// this will look for a VAULT_LOCAL_TOKEN environment variable, which should contain
+// the oken obtained after logging into Vault via the CLI tool.
 func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]interface{}, error) {
 	if appengine.IsDevAppServer() {
 		log.Debugf(ctx, "getting local secrets")
