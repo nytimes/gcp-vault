@@ -48,3 +48,9 @@ func (t *Teller) Tell(ctx context.Context) error {
 	})
 	return t.tellFunc(ctx, t.secrets)
 }
+
+// SetTellFunc allows users to reuse a Teller. This is meant to be used for
+// reusing a Teller across a test suite.
+func (t *Teller) SetTellFunc(f TellFunc) {
+	t.tellFunc = f
+}
