@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -19,17 +18,22 @@ import (
 	"google.golang.org/appengine/urlfetch"
 )
 
-// GetSecrets allows users to access Vault directly without the Teller layer.
-// iamRole is the name of the Vault role given to your service account when configuring
-// GCP and Vault. secretPath is the path of the secrets we wish to fetch from Vault
-// with our IAM role.
+// GetSecrets will use GCP Auth to access any secrets under the given secretPath in
+// Vault. Under the hood, this uses a JWT signed with the App Engine service account to
+// login to Vault. For more details about enabling GCP Auth and Vault visit:
+// https://www.vaultproject.io/docs/auth/gcp.html
 //
-// Under the hood this is using the Vault API client to log in, so make sure you inject
-// the appropriate 'VAULT_*' environment variables like VAULT_ADDR.
+// iamRole is the name of the Vault role given to your service account when configuring
+// GCP and Vault.
+//
+// This is using the Vault API client's 'default config' to log in, so make sure you
+// inject the appropriate 'VAULT_*' environment variables like VAULT_ADDR. For more
+// information about configuring the Vault API client, visit:
+// https://godoc.org/github.com/hashicorp/vault/api#DefaultConfig
 //
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
-// this will look for a VAULT_LOCAL_TOKEN environment variable, which should contain
-// the oken obtained after logging into Vault via the CLI tool.
+// this will look for a VAULT_TOKEN environment variable, which should contain
+// the token obtained after logging into Vault via the CLI tool.
 func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]interface{}, error) {
 	if appengine.IsDevAppServer() {
 		log.Debugf(ctx, "getting local secrets")
@@ -70,15 +74,13 @@ func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]int
 }
 
 func getLocalSecrets(ctx context.Context, secretPath string) (map[string]interface{}, error) {
-	// init vault client
+	// this expects VAULT_TOKEN and VAULT_ADDR to be set at a min
 	vcfg := api.DefaultConfig()
 	vcfg.HttpClient = urlfetch.Client(ctx)
 	vClient, err := api.NewClient(vcfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
-
-	vClient.SetToken(os.Getenv("VAULT_LOCAL_TOKEN"))
 
 	// fetch secrets
 	secrets, err := vClient.Logical().Read(secretPath)
