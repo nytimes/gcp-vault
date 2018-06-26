@@ -21,23 +21,23 @@ import (
 // server.
 type Config struct {
 	// SecretPath is the location of the secrets we whish to fetch from Vault.
-	SecretPath string `VAULT_SECRET_PATH`
+	SecretPath string `envconfig:"VAULT_SECRET_PATH"`
 
 	// Address is the location of the Vault server.
-	Address string `VAULT_ADDR`
+	Address string `envconfig:"VAULT_ADDR"`
 
 	// Role is the role given to your service account when it was registered
 	// with your Vault server. More information about creating roles for your service
 	// account can be found here:
 	// https://www.vaultproject.io/docs/auth/gcp.html#2-roles
-	Role string `VAULT_GCP_IAM_ROLE`
+	Role string `envconfig:"VAULT_GCP_IAM_ROLE"`
 
 	// LocalToken is a Vault auth token obtained from logging into Vault via some outside
 	// method like the command line tool. Users are only expected to pass this token
 	// in local development scenarios.
 	// This token can also be set in the `VAULT_TOKEN` environment variable and the
 	// underlying Vault API client will use it.
-	LocalToken string `VAULT_LOCAL_TOKEN`
+	LocalToken string `envconfig:"VAULT_LOCAL_TOKEN"`
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
