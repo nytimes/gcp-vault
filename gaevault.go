@@ -14,49 +14,67 @@ import (
 
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/urlfetch"
 )
 
-// GetSecrets will use GCP Auth to access any secrets under the given secretPath in
+// Config contains fields for configuring access and secrets retrieval from a Vault
+// server.
+type Config struct {
+	// SecretPath is the location of the secrets we whish to fetch from Vault.
+	SecretPath string `VAULT_SECRET_PATH`
+
+	// Address is the location of the Vault server.
+	Address string `VAULT_ADDR`
+
+	// Role is the role given to your service account when it was registered
+	// with your Vault server. More information about creating roles for your service
+	// account can be found here:
+	// https://www.vaultproject.io/docs/auth/gcp.html#2-roles
+	Role string `VAULT_GCP_IAM_ROLE`
+
+	// LocalToken is a Vault auth token obtained from logging into Vault via some outside
+	// method like the command line tool. Users are only expected to pass this token
+	// in local development scenarios.
+	// This token can also be set in the `VAULT_TOKEN` environment variable and the
+	// underlying Vault API client will use it.
+	LocalToken string `VAULT_LOCAL_TOKEN`
+}
+
+// GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
 // Vault. Under the hood, this uses a JWT signed with the App Engine service account to
 // login to Vault. For more details about enabling GCP Auth and Vault visit:
 // https://www.vaultproject.io/docs/auth/gcp.html
 //
-// iamRole is the name of the Vault role given to your service account when configuring
-// GCP and Vault.
-//
-// This is using the Vault API client's 'default config' to log in, so make sure you
-// inject the appropriate 'VAULT_*' environment variables like VAULT_ADDR. For more
+// This is using the Vault API client's 'default config' to log in so users can provide
+// additional environment variables to fine tune their Vault experience. For more
 // information about configuring the Vault API client, visit:
-// https://godoc.org/github.com/hashicorp/vault/api#DefaultConfig
+// https://github.com/hashicorp/vault/blob/master/api/client.go#L215
 //
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
-// this will look for a VAULT_TOKEN environment variable, which should contain
-// the token obtained after logging into Vault via the CLI tool.
-func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]interface{}, error) {
-	if appengine.IsDevAppServer() {
-		log.Debugf(ctx, "getting local secrets")
-		return getLocalSecrets(ctx, secretPath)
+// this tool will expect the LocalToken to be set in some way.
+func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+	if appengine.IsDevAppServer() || cfg.LocalToken != "" {
+		return getLocalSecrets(ctx, cfg)
 	}
 
 	// create signed JWT with our service account
-	jwt, err := newJWT(ctx, iamRole)
+	jwt, err := newJWT(ctx, cfg.Role)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create JWT")
 	}
 
 	// init vault client
 	vcfg := api.DefaultConfig()
+	vcfg.Address = cfg.Address
 	vcfg.HttpClient = urlfetch.Client(ctx)
 	vClient, err := api.NewClient(vcfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
-	// 'login' to vault
+	// 'login' to vault using GCP auth
 	resp, err := vClient.Logical().Write("auth/gcp/login", map[string]interface{}{
-		"role": iamRole, "jwt": jwt,
+		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
@@ -65,7 +83,7 @@ func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]int
 	vClient.SetToken(resp.Auth.ClientToken)
 
 	// fetch secrets
-	secrets, err := vClient.Logical().Read(secretPath)
+	secrets, err := vClient.Logical().Read(cfg.SecretPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
@@ -73,17 +91,19 @@ func GetSecrets(ctx context.Context, iamRole, secretPath string) (map[string]int
 	return secrets.Data, nil
 }
 
-func getLocalSecrets(ctx context.Context, secretPath string) (map[string]interface{}, error) {
-	// this expects VAULT_TOKEN and VAULT_ADDR to be set at a min
+func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
 	vcfg := api.DefaultConfig()
+	vcfg.Address = cfg.Address
 	vcfg.HttpClient = urlfetch.Client(ctx)
 	vClient, err := api.NewClient(vcfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
+	vClient.SetToken(cfg.LocalToken)
+
 	// fetch secrets
-	secrets, err := vClient.Logical().Read(secretPath)
+	secrets, err := vClient.Logical().Read(cfg.SecretPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
@@ -92,14 +112,14 @@ func getLocalSecrets(ctx context.Context, secretPath string) (map[string]interfa
 }
 
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
-func newJWT(ctx context.Context, iamRole string) (string, error) {
+func newJWT(ctx context.Context, role string) (string, error) {
 	serviceAccount, err := appengine.ServiceAccount(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to find service account")
 	}
 
 	payload, err := json.Marshal(map[string]interface{}{
-		"aud": "vault/" + iamRole,
+		"aud": "vault/" + role,
 		"sub": serviceAccount,
 		"exp": time.Now().UTC().Add(5 * time.Minute).Unix(),
 	})
