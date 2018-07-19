@@ -20,7 +20,7 @@ import (
 // Config contains fields for configuring access and secrets retrieval from a Vault
 // server.
 type Config struct {
-	// SecretPath is the location of the secrets we whish to fetch from Vault.
+	// SecretPath is the location of the secrets we wish to fetch from Vault.
 	SecretPath string `envconfig:"VAULT_SECRET_PATH"`
 
 	// Address is the location of the Vault server.
@@ -38,6 +38,10 @@ type Config struct {
 	// This token can also be set in the `VAULT_TOKEN` environment variable and the
 	// underlying Vault API client will use it.
 	LocalToken string `envconfig:"VAULT_LOCAL_TOKEN"`
+
+	// AuthPath is the path the GCP authentication method is mounted at.
+	// Defaults to 'auth/gcp'.
+	AuthPath string `envconfig:"VAULT_GCP_PATH" default:"auth/gcp"`
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -73,7 +77,7 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	}
 
 	// 'login' to vault using GCP auth
-	resp, err := vClient.Logical().Write("auth/gcp/login", map[string]interface{}{
+	resp, err := vClient.Logical().Write(cfg.AuthPath + "/login", map[string]interface{}{
 		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
