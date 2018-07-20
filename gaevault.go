@@ -46,13 +46,18 @@ type Config struct {
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
 // Vault. Under the hood, this uses a JWT signed with the App Engine service account to
-// login to Vault. For more details about enabling GCP Auth and Vault visit:
+// login to Vault via https://godoc.org/github.com/hashicorp/vault/api#Logical.Write and
+// to read secrets via https://godoc.org/github.com/hashicorp/vault/api#Logical.Read. For
+// more details about enabling GCP Auth and Vault visit:
 // https://www.vaultproject.io/docs/auth/gcp.html
+//
+// The map[string]interface{} returned is the actual contents of the secret referenced in
+// the Config.SecretPath.
 //
 // This is using the Vault API client's 'default config' to log in so users can provide
 // additional environment variables to fine tune their Vault experience. For more
-// information about configuring the Vault API client, visit:
-// https://github.com/hashicorp/vault/blob/master/api/client.go#L215
+// information about configuring the Vault API client, view the code behind:
+// https://godoc.org/github.com/hashicorp/vault/api#Config.ReadEnvironment
 //
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
@@ -77,7 +82,7 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	}
 
 	// 'login' to vault using GCP auth
-	resp, err := vClient.Logical().Write(cfg.AuthPath + "/login", map[string]interface{}{
+	resp, err := vClient.Logical().Write(cfg.AuthPath+"/login", map[string]interface{}{
 		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
