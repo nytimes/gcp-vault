@@ -42,6 +42,12 @@ type Config struct {
 	// AuthPath is the path the GCP authentication method is mounted at.
 	// Defaults to 'auth/gcp'.
 	AuthPath string `envconfig:"VAULT_GCP_PATH" default:"auth/gcp"`
+
+	// MaxRetries sets the number of retries that will be used in the case of certain
+	// errors. The underlying Vault client will pull this value out of the environment
+	// on it's own, but we're including it here so users can apply the same number of
+	// attempts towards signing the JWT with Google's IAM services.
+	MaxRetries int `envconfig:"VAULT_MAX_RETRIES" default:"3"`
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -67,13 +73,14 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	}
 
 	// create signed JWT with our service account
-	jwt, err := newJWT(ctx, cfg.Role)
+	jwt, err := newJWT(ctx, cfg.Role, cfg.MaxRetries)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create JWT")
 	}
 
 	// init vault client
 	vcfg := api.DefaultConfig()
+	vcfg.MaxRetries = cfg.MaxRetries
 	vcfg.Address = cfg.Address
 	vcfg.HttpClient = urlfetch.Client(ctx)
 	vClient, err := api.NewClient(vcfg)
@@ -120,8 +127,22 @@ func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, e
 	return secrets.Data, nil
 }
 
+func newJWT(ctx context.Context, role string, maxRetries int) (string, error) {
+	var (
+		jwt string
+		err error
+	)
+	for retries := 0; retries <= maxRetries; retries++ {
+		jwt, err = newJWTBase(ctx, role)
+		if err == nil {
+			return jwt, nil
+		}
+	}
+	return "", errors.Wrapf(err, "unable to sign JWT after %d retries", maxRetries)
+}
+
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
-func newJWT(ctx context.Context, role string) (string, error) {
+func newJWTBase(ctx context.Context, role string) (string, error) {
 	serviceAccount, err := appengine.ServiceAccount(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to find service account")
@@ -149,6 +170,5 @@ func newJWT(ctx context.Context, role string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "unable to sign JWT")
 	}
-
 	return resp.SignedJwt, nil
 }
