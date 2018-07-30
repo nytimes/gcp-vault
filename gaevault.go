@@ -47,7 +47,7 @@ type Config struct {
 	// errors. The underlying Vault client will pull this value out of the environment
 	// on it's own, but we're including it here so users can apply the same number of
 	// attempts towards signing the JWT with Google's IAM services.
-	MaxRetries int `envconfig:"VAULT_MAX_RETRIES" default:"3"`
+	MaxRetries int `envconfig:"VAULT_MAX_RETRIES" default:"2"`
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
