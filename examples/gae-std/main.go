@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
-	gaevault "github.com/nytm/gae-vault"
+	gcpvault "github.com/nytm/gcp-vault"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
@@ -31,11 +31,11 @@ func secretsMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		secretsOnce.Do(func() {
 			ctx := appengine.NewContext(r)
 
-			var cfg gaevault.Config
+			var cfg gcpvault.Config
 			envconfig.Process("", &cfg)
 
 			var err error
-			secrets, err = gaevault.GetSecrets(ctx, cfg)
+			secrets, err = gcpvault.GetSecrets(ctx, cfg)
 			if err != nil {
 				log.Errorf(ctx, "unable to fetch secrets: %s", err)
 			}
@@ -46,10 +46,9 @@ func secretsMiddleware(h http.HandlerFunc) http.HandlerFunc {
 }
 
 func myHandler(w http.ResponseWriter, r *http.Request) {
-	// do something with our secrets here!
-	_ = secrets["my-secret"].(string)
+	secret := secrets["my-secret"].(string)
 
-	w.Write([]byte("welcome to my secret service!"))
+	w.Write([]byte("the secret is: " + secret))
 }
 
 func warmUpHandler(w http.ResponseWriter, r *http.Request) {
