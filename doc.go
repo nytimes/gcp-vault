@@ -1,5 +1,5 @@
 // Package gcpvault provides tools for securely retrieving secrets from Vault while
-// running in the Google App Engine Standard Environment.
+// running on Google Cloud infrastructure.
 //
 // To use this library,	users must follow the instructions for enabling GCP
 // authentication: https://www.vaultproject.io/docs/auth/gcp.html
