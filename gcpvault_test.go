@@ -11,10 +11,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/nytm/gcp-vault"
+
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
+
+	gcpvault "github.com/nytm/gcp-vault"
 )
 
 func TestGetSecrets(t *testing.T) {
