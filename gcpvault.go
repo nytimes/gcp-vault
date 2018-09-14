@@ -1,0 +1,217 @@
+package gcpvault
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+
+	"github.com/hashicorp/vault/api"
+	"github.com/pkg/errors"
+
+	iam "google.golang.org/api/iam/v1"
+)
+
+// Config contains fields for configuring access and secrets retrieval from a Vault
+// server.
+type Config struct {
+	// SecretPath is the location of the secrets we wish to fetch from Vault.
+	SecretPath string `envconfig:"VAULT_SECRET_PATH"`
+
+	// VaultAddress is the location of the Vault server.
+	VaultAddress string `envconfig:"VAULT_ADDR"`
+
+	// Role is the role given to your service account when it was registered
+	// with your Vault server. More information about creating roles for your service
+	// account can be found here:
+	// https://www.vaultproject.io/docs/auth/gcp.html#2-roles
+	Role string `envconfig:"VAULT_GCP_IAM_ROLE"`
+
+	// LocalToken is a Vault auth token obtained from logging into Vault via some outside
+	// method like the command line tool. Users are only expected to pass this token
+	// in local development scenarios.
+	// This token can also be set in the `VAULT_TOKEN` environment variable and the
+	// underlying Vault API client will use it.
+	LocalToken string `envconfig:"VAULT_LOCAL_TOKEN"`
+
+	// AuthPath is the path the GCP authentication method is mounted at.
+	// Defaults to 'auth/gcp'.
+	AuthPath string `envconfig:"VAULT_GCP_PATH" default:"auth/gcp"`
+
+	// MaxRetries sets the number of retries that will be used in the case of certain
+	// errors. The underlying Vault client will pull this value out of the environment
+	// on it's own, but we're including it here so users can apply the same number of
+	// attempts towards signing the JWT with Google's IAM services.
+	MaxRetries int `envconfig:"VAULT_MAX_RETRIES" default:"2"`
+
+	// IAMAddress is the location of the GCP IAM server.
+	// This should only used for testing.
+	IAMAddress string `envconfig:"IAM_ADDR"`
+	// MetadataAddress is the location of the GCP metadata
+	// This should only used for testing.
+	MetadataAddress string `envconfig:"METADATA_ADDR"`
+}
+
+// GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
+// Vault. Under the hood, this uses a JWT signed with the default Google application
+// credentials to login to Vault via
+// https://godoc.org/github.com/hashicorp/vault/api#Logical.Write and to read secrets via
+// https://godoc.org/github.com/hashicorp/vault/api#Logical.Read. For more details about
+// enabling GCP Auth and Vault visit: https://www.vaultproject.io/docs/auth/gcp.html
+//
+// The map[string]interface{} returned is the actual contents of the secret referenced in
+// the Config.SecretPath.
+//
+// This is using the Vault API client's 'default config' to log in so users can provide
+// additional environment variables to fine tune their Vault experience. For more
+// information about configuring the Vault API client, view the code behind:
+// https://godoc.org/github.com/hashicorp/vault/api#Config.ReadEnvironment
+//
+// If running in a local development environment (via 'goapp test' or dev_appserver.py)
+// this tool will expect the LocalToken to be set in some way.
+func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+	if cfg.LocalToken != "" {
+		return getLocalSecrets(ctx, cfg)
+	}
+
+	// create signed JWT with our service account
+	jwt, err := newJWT(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create JWT")
+	}
+
+	// init vault client
+	vcfg := api.DefaultConfig()
+	vcfg.MaxRetries = cfg.MaxRetries
+	vcfg.Address = cfg.VaultAddress
+	vcfg.HttpClient = getHTTPClient(ctx)
+	vClient, err := api.NewClient(vcfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to init vault client")
+	}
+
+	// 'login' to vault using GCP auth
+	resp, err := vClient.Logical().Write(cfg.AuthPath+"/login", map[string]interface{}{
+		"role": cfg.Role, "jwt": jwt,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to login to vault")
+	}
+
+	vClient.SetToken(resp.Auth.ClientToken)
+
+	// fetch secrets
+	secrets, err := vClient.Logical().Read(cfg.SecretPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get secrets")
+	}
+
+	return secrets.Data, nil
+}
+
+func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+	vcfg := api.DefaultConfig()
+	vcfg.Address = cfg.VaultAddress
+	vcfg.HttpClient = getHTTPClient(ctx)
+	vClient, err := api.NewClient(vcfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to init vault client")
+	}
+
+	vClient.SetToken(cfg.LocalToken)
+
+	// fetch secrets
+	secrets, err := vClient.Logical().Read(cfg.SecretPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get secrets")
+	}
+
+	return secrets.Data, nil
+}
+
+func newJWT(ctx context.Context, cfg Config) (string, error) {
+	var (
+		jwt string
+		err error
+	)
+	for retries := 0; retries <= cfg.MaxRetries; retries++ {
+		jwt, err = newJWTBase(ctx, cfg)
+		if err == nil {
+			return jwt, nil
+		}
+	}
+	return "", errors.Wrapf(err, "unable to sign JWT after %d retries", cfg.MaxRetries)
+}
+
+// created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
+func newJWTBase(ctx context.Context, cfg Config) (string, error) {
+	serviceAccount, project, tokenSource, err := getServiceAccountInfo(ctx, cfg)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to get service account from environment")
+	}
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"aud": "vault/" + cfg.Role,
+		"sub": serviceAccount,
+		"exp": time.Now().UTC().Add(5 * time.Minute).Unix(),
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "unable to encode JWT payload")
+	}
+
+	iamClient, err := iam.New(oauth2.NewClient(ctx, tokenSource))
+	if err != nil {
+		return "", errors.Wrap(err, "unable to init IAM client")
+	}
+
+	if cfg.IAMAddress != "" {
+		iamClient.BasePath = cfg.IAMAddress
+	}
+
+	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
+		fmt.Sprintf("projects/%s/serviceAccounts/%s",
+			project, serviceAccount),
+		&iam.SignJwtRequest{Payload: string(payload)}).Context(ctx).Do()
+	if err != nil {
+		return "", errors.Wrap(err, "unable to sign JWT")
+	}
+	return resp.SignedJwt, nil
+}
+
+func getServiceAccountInfo(ctx context.Context, cfg Config) (string, string, oauth2.TokenSource, error) {
+	creds, err := google.FindDefaultCredentials(ctx, iam.CloudPlatformScope)
+	if err != nil {
+		return "", "", nil, errors.Wrap(err, "unable to find credentials to sign JWT")
+	}
+
+	serviceAccountEmail, err := getEmailFromCredentials(creds)
+	if err != nil {
+		return "", "", nil, errors.Wrap(err, "unable to get email from given credentials")
+	}
+
+	if serviceAccountEmail == "" {
+		serviceAccountEmail, err = getDefaultServiceAccountEmail(ctx, cfg)
+		if err != nil {
+			return "", "", nil, err
+		}
+	}
+
+	return serviceAccountEmail, creds.ProjectID, creds.TokenSource, nil
+}
+
+func getEmailFromCredentials(creds *google.Credentials) (string, error) {
+	if len(creds.JSON) == 0 {
+		return "", nil
+	}
+
+	var data map[string]string
+	err := json.Unmarshal(creds.JSON, &data)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to parse credentials")
+	}
+
+	return data["client_email"], nil
+}
