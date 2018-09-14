@@ -16,7 +16,7 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 
-	gcpvault "github.com/nytm/gcp-vault"
+	gcpvault "github.com/NYTimes/gcp-vault"
 )
 
 func TestGetSecrets(t *testing.T) {
