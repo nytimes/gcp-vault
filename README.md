@@ -16,7 +16,7 @@ For local development, users should use a Github personal access tokens or some 
 
 ## Unit Testing
 
-For mocking out the services required for interactinv with Vault, a [gcpvaulttest](https://github.com/NYTimes/gcp-vault/tree/master/gcpvaulttest/) package has been included to provide `httptest.Server`s for each dependency.
+For mocking out the services required for interactinv with Vault, a [gcpvaulttest](https://godoc.org/github.com/NYTimes/gcp-vault/gcpvaulttest) package has been included to provide `httptest.Server`s for each dependency.
 
 ## Examples
 
