@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/NYTimes/gcp-vault"
+	gcpvault "github.com/nytimes/gcp-vault"
 	"github.com/pkg/errors"
 )
 

@@ -7,11 +7,11 @@ import (
 
 	"google.golang.org/appengine/log"
 
-	"github.com/NYTimes/marvin"
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/NYTimes/gcp-vault"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/marvin"
 )
 
 func NewService() *service {

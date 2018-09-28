@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/NYTimes/gizmo/server/kit"
-	gcpvault "github.com/NYTimes/gcp-vault"
-	"github.com/NYTimes/gcp-vault/gcpvaulttest"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gcp-vault/gcpvaulttest"
+	"github.com/nytimes/gizmo/server/kit"
 )
 
 func TestMySecretEndpoint(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/NYTimes/gcp-vault"
+	gcpvault "github.com/nytimes/gcp-vault"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"

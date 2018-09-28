@@ -3,7 +3,7 @@ package gizmoexample
 import (
 	"context"
 
-	gcpvault "github.com/NYTimes/gcp-vault"
+	gcpvault "github.com/nytimes/gcp-vault"
 	"github.com/pkg/errors"
 )
 

@@ -8,9 +8,9 @@ import (
 
 	"google.golang.org/appengine/aetest"
 
-	"github.com/NYTimes/marvin"
-	gcpvault "github.com/NYTimes/gcp-vault"
-	"github.com/NYTimes/gcp-vault/gcpvaulttest"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gcp-vault/gcpvaulttest"
+	"github.com/nytimes/marvin"
 )
 
 func TestMySecretEndpoint(t *testing.T) {

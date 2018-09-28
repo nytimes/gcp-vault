@@ -1,6 +1,6 @@
 # gcpvault
 
-[![GoDoc](https://godoc.org/github.com/NYTimes/gcp-vault?status.svg)](https://godoc.org/github.com/NYTimes/gcp-vault)
+[![GoDoc](https://godoc.org/github.com/nytimes/gcp-vault?status.svg)](https://godoc.org/github.com/nytimes/gcp-vault)
 
 `gcpvault` provides a function for securely retrieving secrets from [HashiCorp Vault](https://www.vaultproject.io/) while running on the [Google Cloud Platform](https://cloud.google.com/) or in your local development environment.
 
@@ -16,8 +16,8 @@ For local development, users should use a Github personal access tokens or some 
 
 ## Unit Testing
 
-For mocking out the services required for interactinv with Vault, a [gcpvaulttest](https://godoc.org/github.com/NYTimes/gcp-vault/gcpvaulttest) package has been included to provide `httptest.Server`s for each dependency.
+For mocking out the services required for interactinv with Vault, a [gcpvaulttest](https://godoc.org/github.com/nytimes/gcp-vault/gcpvaulttest) package has been included to provide `httptest.Server`s for each dependency.
 
 ## Examples
 
-Check out the [examples](https://github.com/NYTimes/gcp-vault/tree/master/examples/) directory for examples on how to use this package.
+Check out the [examples](https://github.com/nytimes/gcp-vault/tree/master/examples/) directory for examples on how to use this package.

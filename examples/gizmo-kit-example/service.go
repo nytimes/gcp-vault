@@ -7,11 +7,11 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/NYTimes/gizmo/server/kit"
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/NYTimes/gcp-vault"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gizmo/server/kit"
 )
 
 func NewService() (*service, error) {
