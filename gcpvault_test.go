@@ -59,7 +59,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GCP standard login, success",
 
-			givenEmail: "jp@gcp.com",
+			givenEmail: "jp@example.com",
 			givenCfg: gcpvault.Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
@@ -116,7 +116,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GCP standard login, vault fail",
 
-			givenEmail: "jp@gcp.com",
+			givenEmail: "jp@example.com",
 			givenCfg: gcpvault.Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
@@ -132,7 +132,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GCP standard login, iam fail",
 
-			givenEmail: "jp@gcp.com",
+			givenEmail: "jp@example.com",
 			givenCfg: gcpvault.Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
@@ -148,7 +148,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GCP standard login, meta fail",
 
-			givenEmail: "jp@gcp.com",
+			givenEmail: "jp@example.com",
 			givenCfg: gcpvault.Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
