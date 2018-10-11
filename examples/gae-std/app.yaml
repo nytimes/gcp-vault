@@ -13,6 +13,6 @@ handlers:
     script: _go_app
 
 env_variables:
-  VAULT_ADDR: https://vault.your-company.com
+  VAULT_ADDR: https://vault.example.com
   VAULT_SECRET_PATH: "repo-name/secret/my-secrets"
   VAULT_GCP_IAM_ROLE: "my-svc-acct-vault-role"

@@ -7,19 +7,22 @@ import (
 
 	"google.golang.org/grpc"
 
+	gcpvault "github.com/NYTimes/gcp-vault"
 	"github.com/NYTimes/gizmo/server/kit"
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/NYTimes/gcp-vault"
 )
 
 func NewService() (*service, error) {
 	var cfg gcpvault.Config
 	envconfig.Process("", &cfg)
 	svc := &service{vaultConfig: cfg}
-	// init the secrets on server startup
+
+	// init the secrets as our server starts up so we can fail fast if something goes
+	// wrong
 	err := svc.initSecrets(context.Background())
+
 	return svc, err
 }
 
@@ -31,16 +34,7 @@ type service struct {
 }
 
 func (s *service) HTTPMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// ensure secrets are fully loaded before any request comes through
-		err := s.initSecrets(context.Background())
-		if err != nil {
-			kit.LogErrorMsg(r.Context(), err, "unable to fetch secrets")
-		}
-
-		// call next layer down
-		h.ServeHTTP(w, r)
-	})
+	return h
 }
 
 func (s *service) Middleware(e endpoint.Endpoint) endpoint.Endpoint {

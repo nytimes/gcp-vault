@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export VAULT_ADDR="https://vault.your-company.com";
+export VAULT_ADDR="https://vault.example.com";
 
 vault login -method=github token=`cat ~/.config/vault/github` > /dev/null 2>&1;
 
@@ -15,7 +15,7 @@ handlers:
 
 env_variables:
   VAULT_LOCAL_TOKEN: "`cat ~/.vault-token`"
-  VAULT_ADDR: https://vault.your-company.com
+  VAULT_ADDR: https://vault.example.com
   VAULT_SECRET_PATH: "repo-name/secret/my-secrets"
 EOF
 

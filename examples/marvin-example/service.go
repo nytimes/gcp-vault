@@ -7,11 +7,11 @@ import (
 
 	"google.golang.org/appengine/log"
 
+	gcpvault "github.com/NYTimes/gcp-vault"
 	"github.com/NYTimes/marvin"
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
-	gcpvault "github.com/NYTimes/gcp-vault"
 )
 
 func NewService() *service {
@@ -34,7 +34,11 @@ func (s *service) HTTPMiddleware(h http.Handler) http.Handler {
 
 func (s *service) Middleware(e endpoint.Endpoint) endpoint.Endpoint {
 	return func(ctx context.Context, r interface{}) (interface{}, error) {
+
 		// attempt to fetch our secrets 1 time only when the first request comes in.
+		// GAE standard only allows network access within the scope of an inbound request
+		// so we must use our middleware to ensure the first request (hopefully a warmup
+		// request) fetches the secrets before any other action happens on the service.
 		err := s.initSecrets(ctx)
 		if err != nil {
 			log.Errorf(ctx, "unable to init secrets: %s", err)
