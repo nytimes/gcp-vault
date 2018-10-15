@@ -171,6 +171,8 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 	if cfg.IAMAddress != "" {
 		iamClient.BasePath = cfg.IAMAddress
 		log.Printf("SETTING IAM ADDRESS TO: %s", cfg.IAMAddress)
+	} else {
+		log.Printf("SKIPPING IAM SET?! %q", cfg.IAMAddress)
 	}
 
 	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
