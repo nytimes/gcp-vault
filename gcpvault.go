@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -169,6 +170,7 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 
 	if cfg.IAMAddress != "" {
 		iamClient.BasePath = cfg.IAMAddress
+		log.Printf("SETTING IAM ADDRESS TO: %s", cfg.IAMAddress)
 	}
 
 	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
