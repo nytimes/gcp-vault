@@ -13,7 +13,6 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
@@ -252,7 +251,7 @@ func TestGetSecrets(t *testing.T) {
 			ctx := context.Background()
 			if test.givenGAE {
 				if !appengine.IsDevAppServer() {
-					t.Log("skpping GAE test outside GAE environment")
+					t.Log("skipping GAE test outside GAE environment")
 					t.SkipNow()
 					return
 				}
