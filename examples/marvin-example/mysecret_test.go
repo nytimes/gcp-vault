@@ -6,14 +6,19 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 
-	"github.com/NYTimes/marvin"
 	gcpvault "github.com/NYTimes/gcp-vault"
 	"github.com/NYTimes/gcp-vault/gcpvaulttest"
+	"github.com/NYTimes/marvin"
 )
 
 func TestMySecretEndpoint(t *testing.T) {
+	if !appengine.IsDevAppServer() {
+		t.Skip()
+		return
+	}
 	vaultSvr := gcpvaulttest.NewVaultServer(map[string]interface{}{"my-secret": "abcdefg"})
 	defer vaultSvr.Close()
 

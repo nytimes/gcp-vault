@@ -1,4 +1,4 @@
-package gcpvault_test
+package gcpvault
 
 import (
 	"context"
@@ -11,23 +11,24 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
-
-	gcpvault "github.com/NYTimes/gcp-vault"
 )
 
 func TestGetSecrets(t *testing.T) {
 	tests := []struct {
 		name          string
-		givenCfg      gcpvault.Config
+		givenCfg      Config
 		givenSecrets  map[string]interface{}
 		givenEmail    string
 		givenVaultErr bool
 		givenIAMErr   bool
 		givenMetaErr  bool
 		givenGAE      bool
+		givenCreds    *google.Credentials
 
 		wantVaultLogin bool
 		wantVaultRead  bool
@@ -39,7 +40,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "local token, success",
 
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				LocalToken: "my-local-token",
 				SecretPath: "my-secret-path",
@@ -59,13 +60,20 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, success",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:  true,
@@ -80,7 +88,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GAE standard login, success",
 
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -101,7 +109,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GCP standard login, no meta email, fail",
 
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -116,7 +124,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, vault fail",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -132,7 +140,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, iam fail",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -148,7 +156,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, meta fail",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -165,7 +173,7 @@ func TestGetSecrets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				cfg           gcpvault.Config
+				cfg           Config
 				gotVaultLogin bool
 				gotVaultRead  bool
 				gotIAMHit     bool
@@ -218,6 +226,15 @@ func TestGetSecrets(t *testing.T) {
 				defer metaSvr.Close()
 			}
 
+			if test.givenCreds != nil {
+				findDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+					return test.givenCreds, nil
+				}
+				defer func() {
+					findDefaultCredentials = google.FindDefaultCredentials
+				}()
+			}
+
 			cfg.AuthPath = test.givenCfg.AuthPath
 			cfg.SecretPath = test.givenCfg.SecretPath
 			cfg.LocalToken = test.givenCfg.LocalToken
@@ -249,7 +266,7 @@ func TestGetSecrets(t *testing.T) {
 				defer done()
 			}
 
-			gotSecrets, gotErr := gcpvault.GetSecrets(ctx, cfg)
+			gotSecrets, gotErr := GetSecrets(ctx, cfg)
 			if test.wantErr != (gotErr != nil) {
 				t.Errorf("expected error %t, but got %s", test.wantErr, gotErr)
 			}
@@ -276,4 +293,10 @@ func TestGetSecrets(t *testing.T) {
 		})
 	}
 
+}
+
+type testTokenSource struct{}
+
+func (t testTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{}, nil
 }
