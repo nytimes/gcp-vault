@@ -11,7 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
-
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
@@ -235,7 +234,7 @@ func TestGetSecrets(t *testing.T) {
 			ctx := context.Background()
 			if test.givenGAE {
 				if !appengine.IsDevAppServer() {
-					t.Log("skpping GAE test outside GAE environment")
+					t.Log("skipping GAE test outside GAE environment")
 					t.SkipNow()
 					return
 				}
