@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -170,9 +169,6 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 
 	if cfg.IAMAddress != "" {
 		iamClient.BasePath = cfg.IAMAddress
-		log.Printf("SETTING IAM ADDRESS TO: %s", cfg.IAMAddress)
-	} else {
-		log.Printf("SKIPPING IAM SET?! %q", cfg.IAMAddress)
 	}
 
 	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
@@ -185,8 +181,10 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 	return resp.SignedJwt, nil
 }
 
+var findDefaultCredentials = google.FindDefaultCredentials
+
 func getServiceAccountInfo(ctx context.Context, cfg Config) (string, string, oauth2.TokenSource, error) {
-	creds, err := google.FindDefaultCredentials(ctx, iam.CloudPlatformScope)
+	creds, err := findDefaultCredentials(ctx, iam.CloudPlatformScope)
 	if err != nil {
 		return "", "", nil, errors.Wrap(err, "unable to find credentials to sign JWT")
 	}
