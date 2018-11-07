@@ -254,10 +254,12 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 	if len(creds.JSON) == 0 {
 		return "", nil
 	}
+
 	var data map[string]string
 	err := json.Unmarshal(creds.JSON, &data)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse credentials")
 	}
+
 	return data["client_email"], nil
 }
