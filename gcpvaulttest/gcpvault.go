@@ -20,7 +20,7 @@ func NewVaultServer(secrets map[string]interface{}) *httptest.Server {
 	}
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "login") {
+		if strings.Contains(r.URL.Path, "/login") {
 			json.NewEncoder(w).Encode(api.Secret{
 				Auth: &api.SecretAuth{ClientToken: "vault-test-token"},
 			})
