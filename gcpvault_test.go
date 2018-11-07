@@ -11,7 +11,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
-
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
@@ -27,6 +28,7 @@ func TestGetSecrets(t *testing.T) {
 		givenIAMErr   bool
 		givenMetaErr  bool
 		givenGAE      bool
+		givenCreds    *google.Credentials
 
 		wantVaultLogin bool
 		wantVaultRead  bool
@@ -65,6 +67,13 @@ func TestGetSecrets(t *testing.T) {
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:  true,
@@ -217,6 +226,15 @@ func TestGetSecrets(t *testing.T) {
 				defer metaSvr.Close()
 			}
 
+			if test.givenCreds != nil {
+				findDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+					return test.givenCreds, nil
+				}
+				defer func() {
+					findDefaultCredentials = google.FindDefaultCredentials
+				}()
+			}
+
 			cfg.AuthPath = test.givenCfg.AuthPath
 			cfg.SecretPath = test.givenCfg.SecretPath
 			cfg.LocalToken = test.givenCfg.LocalToken
@@ -233,7 +251,7 @@ func TestGetSecrets(t *testing.T) {
 			ctx := context.Background()
 			if test.givenGAE {
 				if !appengine.IsDevAppServer() {
-					t.Log("skpping GAE test outside GAE environment")
+					t.Log("skipping GAE test outside GAE environment")
 					t.SkipNow()
 					return
 				}
@@ -275,4 +293,10 @@ func TestGetSecrets(t *testing.T) {
 		})
 	}
 
+}
+
+type testTokenSource struct{}
+
+func (t testTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{}, nil
 }
