@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/api"
@@ -86,9 +87,17 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
+
+	// if secrets are versioned, we have to go deeper
+	if strings.Contains(cfg.SecretPath, "/versioned/") {
+		return secrets.Data["data"].(map[string]interface{}), nil
+	}
+
 	return secrets.Data, nil
 }
 
+// PutSecrets writes secrets to Vault at the configured path.
+// This is comparable to the `vault write` command.
 func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
 	vClient, err := login(ctx, cfg)
 	if err != nil {
@@ -99,23 +108,17 @@ func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{})
 	return errors.Wrap(err, "unable to make vault request")
 }
 
-func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
-	secs, err := GetSecrets(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	// versioned secrets are contained under a 'data' key
-	return secs["data"].(map[string]interface{}), nil
-}
-
-func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]string) error {
+// PutVersionedSecrets writes versioned secrets to Vault at the configured path.
+// The path should be in the form `org/repo/versioned/data/my-secret`
+// This is comparable to the `vault kv put` command.
+func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
 	}
 
 	req := vClient.NewRequest(http.MethodPost, "v1/"+cfg.SecretPath)
-	req.BodyBytes, err = json.Marshal(map[string]map[string]string{
+	req.BodyBytes, err = json.Marshal(map[string]map[string]interface{}{
 		"data": secrets,
 	})
 	if err != nil {
