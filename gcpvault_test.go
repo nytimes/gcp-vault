@@ -271,6 +271,9 @@ func TestGetSecrets(t *testing.T) {
 			if test.wantErr != (gotErr != nil) {
 				t.Errorf("expected error %t, but got %s", test.wantErr, gotErr)
 			}
+			if test.wantErr {
+				return
+			}
 
 			if test.wantIAMHit != gotIAMHit {
 				t.Errorf("expected IAM hit? %t - got %t", test.wantIAMHit, gotIAMHit)
