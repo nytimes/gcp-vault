@@ -5,25 +5,43 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-
-	iam "google.golang.org/api/iam/v1"
+	"strings"
+	"sync"
 
 	"github.com/hashicorp/vault/api"
+	iam "google.golang.org/api/iam/v1"
 )
 
 func NewVaultServer(secrets map[string]interface{}) *httptest.Server {
+	var mu sync.Mutex
+
+	if secrets == nil {
+		secrets = map[string]interface{}{}
+	}
+
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		switch r.Method {
 		case http.MethodGet:
 			json.NewEncoder(w).Encode(api.Secret{
 				Data: secrets,
 			})
+		case http.MethodPost: // versioned secrets save
+			var incoming map[string]interface{}
+			json.NewDecoder(r.Body).Decode(&incoming)
+			secrets["data"] = incoming["data"]
 		case http.MethodPut:
-			json.NewEncoder(w).Encode(api.Secret{
-				Auth: &api.SecretAuth{
-					ClientToken: "vault-test-token",
-				},
-			})
+			if strings.Contains(r.URL.Path, "login") {
+				json.NewEncoder(w).Encode(api.Secret{
+					Auth: &api.SecretAuth{ClientToken: "vault-test-token"},
+				})
+			} else { // non-versioned secrets save
+				var incoming map[string]interface{}
+				json.NewDecoder(r.Body).Decode(&incoming)
+				secrets = incoming
+			}
 		}
 	}))
 }

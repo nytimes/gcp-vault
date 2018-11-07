@@ -251,10 +251,10 @@ func TestGetSecrets(t *testing.T) {
 			}
 
 			gotSecrets, gotErr := gcpvault.GetSecrets(ctx, cfg)
-			if test.wantErr != (gotErr != nil) {
-				t.Errorf("expected error %t, but got %s", test.wantErr, gotErr)
-			}
 			if test.wantErr {
+				if gotErr == nil {
+					t.Errorf("expected error, but got %v", gotErr)
+				}
 				return
 			}
 

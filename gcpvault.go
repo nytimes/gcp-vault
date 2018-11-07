@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
-
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 
 	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
-
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	iam "google.golang.org/api/iam/v1"
 )
 
@@ -77,20 +76,65 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 		return getLocalSecrets(ctx, cfg)
 	}
 
+	vClient, err := login(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to login to vault")
+	}
+
+	// fetch secrets
+	secrets, err := vClient.Logical().Read(cfg.SecretPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get secrets")
+	}
+	return secrets.Data, nil
+}
+
+func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
+	vClient, err := login(ctx, cfg)
+	if err != nil {
+		return errors.Wrap(err, "unable to login to vault")
+	}
+
+	_, err = vClient.Logical().Write(cfg.SecretPath, secrets)
+	return errors.Wrap(err, "unable to make vault request")
+}
+
+func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+	secs, err := GetSecrets(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	// versioned secrets are contained under a 'data' key
+	return secs["data"].(map[string]interface{}), nil
+}
+
+func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]string) error {
+	vClient, err := login(ctx, cfg)
+	if err != nil {
+		return errors.Wrap(err, "unable to login to vault")
+	}
+
+	req := vClient.NewRequest(http.MethodPost, "v1/"+cfg.SecretPath)
+	req.BodyBytes, err = json.Marshal(map[string]map[string]string{
+		"data": secrets,
+	})
+	if err != nil {
+		return errors.Wrap(err, "unable to marshal request body")
+	}
+	_, err = vClient.RawRequestWithContext(ctx, req)
+	return errors.Wrap(err, "unable to make vault request")
+}
+
+func login(ctx context.Context, cfg Config) (*api.Client, error) {
+	vClient, err := newClient(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to init vault client")
+	}
+
 	// create signed JWT with our service account
 	jwt, err := newJWT(ctx, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to create JWT")
-	}
-
-	// init vault client
-	vcfg := api.DefaultConfig()
-	vcfg.MaxRetries = cfg.MaxRetries
-	vcfg.Address = cfg.VaultAddress
-	vcfg.HttpClient = getHTTPClient(ctx)
-	vClient, err := api.NewClient(vcfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
 	// 'login' to vault using GCP auth
@@ -98,18 +142,20 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to login to vault")
+		return nil, errors.Wrap(err, "unable to make login request")
 	}
 
 	vClient.SetToken(resp.Auth.ClientToken)
 
-	// fetch secrets
-	secrets, err := vClient.Logical().Read(cfg.SecretPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get secrets")
-	}
+	return vClient, nil
+}
 
-	return secrets.Data, nil
+func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
+	vcfg := api.DefaultConfig()
+	vcfg.MaxRetries = cfg.MaxRetries
+	vcfg.Address = cfg.VaultAddress
+	vcfg.HttpClient = getHTTPClient(ctx)
+	return api.NewClient(vcfg)
 }
 
 func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
@@ -206,12 +252,10 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 	if len(creds.JSON) == 0 {
 		return "", nil
 	}
-
 	var data map[string]string
 	err := json.Unmarshal(creds.JSON, &data)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to parse credentials")
 	}
-
 	return data["client_email"], nil
 }
