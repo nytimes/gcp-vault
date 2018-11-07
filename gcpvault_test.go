@@ -1,4 +1,4 @@
-package gcpvault_test
+package gcpvault
 
 import (
 	"context"
@@ -15,14 +15,12 @@ import (
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
-
-	gcpvault "github.com/NYTimes/gcp-vault"
 )
 
 func TestGetSecrets(t *testing.T) {
 	tests := []struct {
 		name          string
-		givenCfg      gcpvault.Config
+		givenCfg      Config
 		givenSecrets  map[string]interface{}
 		givenEmail    string
 		givenVaultErr bool
@@ -40,7 +38,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "local token, success",
 
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				LocalToken: "my-local-token",
 				SecretPath: "my-secret-path",
@@ -60,7 +58,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, success",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -81,7 +79,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GAE standard login, success",
 
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -102,7 +100,7 @@ func TestGetSecrets(t *testing.T) {
 		{
 			name: "GCP standard login, no meta email, fail",
 
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -117,7 +115,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, vault fail",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -133,7 +131,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, iam fail",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -149,7 +147,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, meta fail",
 
 			givenEmail: "jp@example.com",
-			givenCfg: gcpvault.Config{
+			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
@@ -166,7 +164,7 @@ func TestGetSecrets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				cfg           gcpvault.Config
+				cfg           Config
 				gotVaultLogin bool
 				gotVaultRead  bool
 				gotIAMHit     bool
@@ -250,7 +248,7 @@ func TestGetSecrets(t *testing.T) {
 				defer done()
 			}
 
-			gotSecrets, gotErr := gcpvault.GetSecrets(ctx, cfg)
+			gotSecrets, gotErr := GetSecrets(ctx, cfg)
 			if test.wantErr {
 				if gotErr == nil {
 					t.Errorf("expected error, but got %v", gotErr)
