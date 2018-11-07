@@ -20,28 +20,33 @@ func NewVaultServer(secrets map[string]interface{}) *httptest.Server {
 	}
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "login") {
+			json.NewEncoder(w).Encode(api.Secret{
+				Auth: &api.SecretAuth{ClientToken: "vault-test-token"},
+			})
+			return
+		}
+
 		mu.Lock()
 		defer mu.Unlock()
 
 		switch r.Method {
 		case http.MethodGet:
-			json.NewEncoder(w).Encode(api.Secret{
-				Data: secrets,
-			})
+			var v interface{}
+			if strings.Contains(r.URL.Path, "/versioned/") {
+				v = map[string]interface{}{"data": secrets}
+			} else {
+				v = api.Secret{Data: secrets}
+			}
+			json.NewEncoder(w).Encode(v)
+		case http.MethodPut: // non-versioned secrets save
+			var incoming map[string]interface{}
+			json.NewDecoder(r.Body).Decode(&incoming)
+			secrets = incoming
 		case http.MethodPost: // versioned secrets save
 			var incoming map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&incoming)
-			secrets["data"] = incoming["data"]
-		case http.MethodPut:
-			if strings.Contains(r.URL.Path, "login") {
-				json.NewEncoder(w).Encode(api.Secret{
-					Auth: &api.SecretAuth{ClientToken: "vault-test-token"},
-				})
-			} else { // non-versioned secrets save
-				var incoming map[string]interface{}
-				json.NewDecoder(r.Body).Decode(&incoming)
-				secrets = incoming
-			}
+			secrets = incoming["data"].(map[string]interface{})
 		}
 	}))
 }
