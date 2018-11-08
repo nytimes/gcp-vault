@@ -32,21 +32,13 @@ func NewVaultServer(secrets map[string]interface{}) *httptest.Server {
 
 		switch r.Method {
 		case http.MethodGet:
-			var v interface{}
-			if strings.Contains(r.URL.Path, "/versioned/") {
-				v = map[string]interface{}{"data": secrets}
-			} else {
-				v = api.Secret{Data: secrets}
-			}
-			json.NewEncoder(w).Encode(v)
-		case http.MethodPut: // non-versioned secrets save
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": secrets,
+			})
+		case http.MethodPost, http.MethodPut:
 			var incoming map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&incoming)
 			secrets = incoming
-		case http.MethodPost: // versioned secrets save
-			var incoming map[string]interface{}
-			json.NewDecoder(r.Body).Decode(&incoming)
-			secrets = incoming["data"].(map[string]interface{})
 		}
 	}))
 }
