@@ -107,8 +107,8 @@ func TestGetSecrets(t *testing.T) {
 			},
 		},
 		{
-			name: "GCP standard login, no meta email, fail",
-
+			name:       "GCP standard login, no meta email, fail",
+			givenCreds: &google.Credentials{},
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
@@ -156,6 +156,7 @@ func TestGetSecrets(t *testing.T) {
 			name: "GCP standard login, meta fail",
 
 			givenEmail: "jp@example.com",
+			givenCreds: &google.Credentials{},
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
@@ -292,7 +293,6 @@ func TestGetSecrets(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 type testTokenSource struct{}
