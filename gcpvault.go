@@ -55,7 +55,11 @@ type Config struct {
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
-// Vault. Under the hood, this uses a JWT signed with the default Google application
+// Vault.
+//
+// This is comparable to the `vault read` command.
+//
+// Under the hood, this uses a JWT signed with the default Google application
 // credentials to login to Vault via
 // https://godoc.org/github.com/hashicorp/vault/api#Logical.Write and to read secrets via
 // https://godoc.org/github.com/hashicorp/vault/api#Logical.Read. For more details about

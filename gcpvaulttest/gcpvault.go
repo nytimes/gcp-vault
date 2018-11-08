@@ -12,6 +12,9 @@ import (
 	iam "google.golang.org/api/iam/v1"
 )
 
+// NewVaultServer is a stub Vault server for testing. It can be initialized
+// with secrets if they're expected to be read-only by the service. Any writes
+// will override any existing secrets.
 func NewVaultServer(secrets map[string]interface{}) *httptest.Server {
 	var mu sync.Mutex
 
@@ -43,6 +46,7 @@ func NewVaultServer(secrets map[string]interface{}) *httptest.Server {
 	}))
 }
 
+// NewIAMServer creates a test IAM server.
 func NewIAMServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(iam.SignJwtResponse{
@@ -51,6 +55,7 @@ func NewIAMServer() *httptest.Server {
 	}))
 }
 
+// NewMetadataServer creates a test metadata server that returns the given email.
 func NewMetadataServer(serviceAcctEmail string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, serviceAcctEmail)
