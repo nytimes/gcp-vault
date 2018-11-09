@@ -167,9 +167,8 @@ func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	vcfg := api.DefaultConfig()
 	vcfg.MaxRetries = cfg.MaxRetries
 	vcfg.Address = cfg.VaultAddress
-	if cfg.HTTPClient != nil {
-		vcfg.HttpClient = cfg.HTTPClient
-	} else {
+	vcfg.HttpClient = cfg.HTTPClient
+	if vcfg.HttpClient == nil {
 		vcfg.HttpClient = getHTTPClient(ctx)
 	}
 	return api.NewClient(vcfg)
