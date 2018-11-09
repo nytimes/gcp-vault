@@ -52,6 +52,10 @@ type Config struct {
 	// MetadataAddress is the location of the GCP metadata
 	// This should only used for testing.
 	MetadataAddress string `envconfig:"METADATA_ADDR"`
+
+	// HTTPClient allows for providing a custom *http.Client. If not provided, one
+	// will be chosen based on system architecture.
+	HTTPClient *http.Client
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -163,7 +167,11 @@ func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	vcfg := api.DefaultConfig()
 	vcfg.MaxRetries = cfg.MaxRetries
 	vcfg.Address = cfg.VaultAddress
-	vcfg.HttpClient = getHTTPClient(ctx)
+	if cfg.HTTPClient != nil {
+		vcfg.HttpClient = cfg.HTTPClient
+	} else {
+		vcfg.HttpClient = getHTTPClient(ctx)
+	}
 	return api.NewClient(vcfg)
 }
 
