@@ -90,6 +90,9 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get secrets")
 	}
+	if secrets == nil {
+		return nil, errors.New("no secrets found")
+	}
 	return secrets.Data, nil
 }
 
