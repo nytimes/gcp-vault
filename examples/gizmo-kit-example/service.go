@@ -22,7 +22,6 @@ func NewService() (*service, error) {
 	// init the secrets as our server starts up so we can fail fast if something goes
 	// wrong
 	err := svc.initSecrets(context.Background())
-
 	return svc, err
 }
 
