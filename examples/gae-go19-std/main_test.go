@@ -12,6 +12,11 @@ import (
 )
 
 func TestTopStories(t *testing.T) {
+	if os.Getenv("VAULT_SECRET_PATH") == "" {
+		t.Skip()
+		return
+	}
+
 	wr := httptest.NewRecorder()
 
 	inst, err := aetest.NewInstance(nil)

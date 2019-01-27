@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	gcpvault "github.com/NYTimes/gcp-vault"
@@ -17,7 +18,7 @@ func init() {
 	// hooking it in as a middleware.
 	err := initClient(context.Background())
 	if err != nil {
-		panic(err)
+		log.Printf("unable to init client: %s", err)
 	}
 }
 

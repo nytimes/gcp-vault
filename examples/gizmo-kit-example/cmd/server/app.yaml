@@ -1,0 +1,10 @@
+runtime: go111
+service: topstories
+
+inbound_services:
+- warmup
+
+env_variables:
+  VAULT_ADDR: https://vault.example.com
+  VAULT_SECRET_PATH: "repo-name/secret/my-secrets"
+  VAULT_GCP_IAM_ROLE: "my-vault-role-for-the-default-service-account"
