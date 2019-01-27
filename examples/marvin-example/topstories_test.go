@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 
 	gcpvault "github.com/NYTimes/gcp-vault"
@@ -16,6 +17,9 @@ import (
 )
 
 func TestTopStories(t *testing.T) {
+	if !appengine.IsDevAppServer() {
+		t.Skip()
+	}
 	testKey := "my-test-key"
 	vaultSvr := gcpvaulttest.NewVaultServer(map[string]interface{}{"APIKey": testKey})
 	defer vaultSvr.Close()

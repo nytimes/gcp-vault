@@ -8,11 +8,12 @@ import (
 	"testing"
 
 	"github.com/NYTimes/gcp-vault/examples/nyt"
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 )
 
 func TestTopStories(t *testing.T) {
-	if os.Getenv("VAULT_SECRET_PATH") == "" {
+	if os.Getenv("VAULT_SECRET_PATH") == "" || !appengine.IsDevAppServer() {
 		t.Skip()
 		return
 	}
