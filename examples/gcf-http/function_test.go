@@ -18,7 +18,7 @@ func TestTopStories(t *testing.T) {
 	wr := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	MyFunction(wr, r)
+	GetTopScienceStories(wr, r)
 
 	w := wr.Result()
 

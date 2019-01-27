@@ -16,6 +16,6 @@ func main() {
 
 	err = kit.Run(svc)
 	if err != nil {
-		log.Fatal("prboblems running service: ", err)
+		log.Fatal("problems running service: ", err)
 	}
 }

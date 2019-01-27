@@ -27,7 +27,10 @@ func initClient(ctx context.Context) error {
 	var cfg gcpvault.Config
 	envconfig.Process("", &cfg)
 
-	secrets, _ := gcpvault.GetSecrets(ctx, cfg)
+	secrets, err := gcpvault.GetSecrets(ctx, cfg)
+	if err != nil {
+		return err
+	}
 
 	client = nyt.NewClient(nyt.DefaultHost, secrets["APIKey"].(string))
 	return nil
