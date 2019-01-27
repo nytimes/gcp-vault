@@ -3,6 +3,7 @@ package marvinexample
 import (
 	"context"
 	"net/http"
+	"os"
 	"sync"
 
 	"google.golang.org/appengine/log"
@@ -12,20 +13,23 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/pkg/errors"
 )
 
 func NewService() *service {
-	// configure from the environment/app.yaml
 	var cfg gcpvault.Config
 	envconfig.Process("", &cfg)
-	return &service{vaultConfig: cfg}
+	return &service{
+		nytHost: os.Getenv("NYT_HOST"),
+		vcfg:    cfg,
+	}
 }
 
 type service struct {
-	vaultConfig gcpvault.Config
+	nytHost     string
+	vcfg        gcpvault.Config
 	secretsOnce sync.Once
-
-	mySecret string
+	apiKey      string
 }
 
 func (s *service) HTTPMiddleware(h http.Handler) http.Handler {
@@ -39,8 +43,12 @@ func (s *service) Middleware(e endpoint.Endpoint) endpoint.Endpoint {
 		// GAE standard only allows network access within the scope of an inbound request
 		// so we must use our middleware to ensure the first request (hopefully a warmup
 		// request) fetches the secrets before any other action happens on the service.
-		err := s.initSecrets(ctx)
-		if err != nil {
+		// only attempt to call vault 1 time at startup
+		var err error
+		s.secretsOnce.Do(func() {
+			s.apiKey, err = s.getKey(ctx)
+		})
+		if err != nil || s.apiKey == "" {
 			log.Errorf(ctx, "unable to init secrets: %s", err)
 			return nil, marvin.NewJSONStatusResponse("server error",
 				http.StatusInternalServerError)
@@ -53,9 +61,9 @@ func (s *service) Middleware(e endpoint.Endpoint) endpoint.Endpoint {
 
 func (s *service) JSONEndpoints() map[string]map[string]marvin.HTTPEndpoint {
 	return map[string]map[string]marvin.HTTPEndpoint{
-		"/svc/example/v1/my-secret": {
+		"/svc/example/v1/top-stories": {
 			"GET": {
-				Endpoint: s.getMySecret,
+				Endpoint: s.getTopStories,
 			},
 		},
 		"/_ah/warmup": {
@@ -76,4 +84,21 @@ func (s *service) Options() []httptransport.ServerOption {
 // to satisfy the marvin.Service interface
 func (s *service) RouterOptions() []marvin.RouterOption {
 	return nil
+}
+
+func (s *service) getKey(ctx context.Context) (string, error) {
+	secrets, err := gcpvault.GetSecrets(ctx, s.vcfg)
+	if err != nil {
+		return "", err
+	}
+	keyI, ok := secrets["APIKey"]
+	if !ok {
+		return "", errors.New("APIKey secret is not found")
+	}
+	key, ok := keyI.(string)
+	if !ok {
+		return "", errors.New("APIKey secret is not a string")
+	}
+
+	return key, nil
 }

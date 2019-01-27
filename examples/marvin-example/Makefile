@@ -1,18 +1,18 @@
-_localyaml: _vault
-	@echo "$$LOCALYAML" > local.yaml;
 
 run: _localyaml
-	@goapp serve local.yaml
+	@cd ./cmd/server; \
+	goapp serve local.yaml;
 
-test: _vault
-	@export VAULT_ADDR=$$VAULT_ADDR; \
-	export VAULT_LOCAL_TOKEN="`cat ~/.vault-token`"; \
-	export VAULT_SECRET_PATH="repo-name/secret/my-secrets"; \
-	goapp test ./... -v -cover 
+test:
+	@go test ./... -v -cover
 
 _vault:
 	@export VAULT_ADDR=$$VAULT_ADDR; \
 	vault login -method=github token=`cat ~/.config/vault/github` > /dev/null 2>&1;
+
+_localyaml: _vault
+	@cd ./cmd/server; \
+	echo "$$LOCALYAML" > local.yaml;
 
 VAULT_ADDR=https://vault.example.com
 
