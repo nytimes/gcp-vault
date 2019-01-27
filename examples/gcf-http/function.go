@@ -3,7 +3,6 @@ package gcfexample
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 
@@ -27,25 +26,15 @@ var client nyt.Client
 func initClient(ctx context.Context) error {
 	var cfg gcpvault.Config
 	envconfig.Process("", &cfg)
-	secrets, err := gcpvault.GetSecrets(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	keyI, ok := secrets["APIKey"]
-	if !ok {
-		return errors.New("APIKey secret is not found")
-	}
-	key, ok := keyI.(string)
-	if !ok {
-		return errors.New("APIKey secret is not a string")
-	}
 
-	client = nyt.NewClient(nyt.DefaultHost, key)
+	secrets, _ := gcpvault.GetSecrets(ctx, cfg)
+
+	client = nyt.NewClient(nyt.DefaultHost, secrets["APIKey"].(string))
 	return nil
 }
 
-func MyFunction(w http.ResponseWriter, r *http.Request) {
-	stories, err := client.GetTopStories(context.Background(), "science")
+func GetTopScienceStories(w http.ResponseWriter, r *http.Request) {
+	stories, err := client.GetTopStories(r.Context(), "science")
 	if err != nil {
 		http.Error(w, "unable to get top stories", http.StatusInternalServerError)
 		return
