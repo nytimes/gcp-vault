@@ -44,7 +44,7 @@ func (s *service) HTTPEndpoints() map[string]map[string]kit.HTTPEndpoint {
 	return map[string]map[string]kit.HTTPEndpoint{
 		"/svc/example/v1/top-stories": {
 			"GET": {
-				Endpoint: s.getTopStories,
+				Endpoint: s.getTopScienceStories,
 			},
 		},
 	}
