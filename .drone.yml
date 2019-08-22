@@ -26,3 +26,8 @@ steps:
   - go test -race -vet all -mod readonly ./...
   depends_on:
   - mod-download
+
+- name: test-1.9
+  image: golang:1.9
+  commands:
+  - go test -race -vet all ./...
