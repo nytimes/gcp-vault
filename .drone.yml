@@ -26,11 +26,3 @@ steps:
   - go test -race -vet all -mod readonly ./...
   depends_on:
   - mod-download
-
-- name: lint
-  pull: always
-  image: golangci/golangci-lint
-  commands:
-  - golangci-lint run --enable-all -D errcheck -D lll -D dupl -D gochecknoglobals --deadline 5m ./...
-  depends_on:
-  - mod-download
