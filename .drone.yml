@@ -1,0 +1,28 @@
+---
+kind: pipeline
+name: build_go
+
+platform:
+  os: linux
+  arch: amd64
+
+workspace:
+  base: /go
+  path: gcp-vault
+
+steps:
+- name: mod-download
+  image: golang:1.12
+  commands:
+  - go mod download
+  environment:
+    GOPROXY: https://proxy.golang.org
+  depends_on:
+  - clone
+
+- name: test
+  image: golang:1.12
+  commands:
+  - go test -race -vet all -mod readonly ./...
+  depends_on:
+  - mod-download

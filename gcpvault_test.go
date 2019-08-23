@@ -301,6 +301,7 @@ func TestPutVersionedSecrets(t *testing.T) {
 		givenCfg        Config
 		startingSecrets map[string]interface{}
 		givenEmail      string
+		givenCreds    *google.Credentials
 
 		wantVaultLogin bool
 		wantVaultWrite bool
@@ -310,8 +311,8 @@ func TestPutVersionedSecrets(t *testing.T) {
 		wantSecrets    map[string]interface{}
 	}{
 		{
-			name: "basic put, success",
-
+			name: "GCP standard login, success",
+			givenEmail: "jp@example.com",
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				LocalToken: "my-local-token",
@@ -324,10 +325,19 @@ func TestPutVersionedSecrets(t *testing.T) {
 			wantVaultLogin: true,
 			wantVaultWrite: true,
 			wantIAMHit:     true,
+			wantMetaHit:    true,
 			putSecrets: map[string]interface{}{
 				"my-sec":       "456",
 				"my-other-sec": "wxyz",
 			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+			  "client_secret": "abcd",  "refresh_token": "blah",
+		  "client_email": "",  "type": "service_account"}`),
+			},
+
 
 			// versioned secrets are contained under a 'data' key
 			wantSecrets: map[string]interface{}{
@@ -384,6 +394,15 @@ func TestPutVersionedSecrets(t *testing.T) {
 				io.WriteString(w, test.givenEmail)
 			}))
 			defer metaSvr.Close()
+
+			if test.givenCreds != nil {
+				findDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+					return test.givenCreds, nil
+				}
+				defer func() {
+					findDefaultCredentials = google.FindDefaultCredentials
+				}()
+			}
 
 			cfg.AuthPath = test.givenCfg.AuthPath
 			cfg.SecretPath = test.givenCfg.SecretPath

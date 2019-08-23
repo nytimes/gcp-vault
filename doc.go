@@ -6,4 +6,4 @@
 //
 // For local development, users should use something like Github personal access tokens
 // to log into vault before injecting their Vault login token into the local environment.
-package gcpvault
+package gcpvault // import "github.com/NYTimes/gcp-vault"
