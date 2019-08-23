@@ -126,7 +126,7 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 		return errors.Wrap(err, "unable to login to vault")
 	}
 
-	req := vClient.NewRequest(http.MethodPost, "v1/"+cfg.SecretPath)
+	req := vClient.NewRequest(http.MethodPost, "/v1/"+cfg.SecretPath)
 	req.BodyBytes, err = json.Marshal(map[string]map[string]interface{}{
 		"data": secrets,
 	})

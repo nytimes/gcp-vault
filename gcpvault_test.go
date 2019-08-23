@@ -13,7 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	iam "google.golang.org/api/iam/v1"
+	"google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 )
@@ -290,6 +290,154 @@ func TestGetSecrets(t *testing.T) {
 
 			if !cmp.Equal(test.wantSecrets, gotSecrets) {
 				t.Errorf("secrets differ: (-want +got)\n%s", cmp.Diff(test.wantSecrets, gotSecrets))
+			}
+		})
+	}
+}
+
+func TestPutVersionedSecrets(t *testing.T) {
+	tests := []struct {
+		name            string
+		givenCfg        Config
+		startingSecrets map[string]interface{}
+		givenEmail      string
+		givenCreds    *google.Credentials
+
+		wantVaultLogin bool
+		wantVaultWrite bool
+		wantIAMHit     bool
+		wantMetaHit    bool
+		putSecrets     map[string]interface{}
+		wantSecrets    map[string]interface{}
+	}{
+		{
+			name: "GCP standard login, success",
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:       "my-gcp-role",
+				LocalToken: "my-local-token",
+				SecretPath: "my-secret-path",
+			},
+			startingSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			wantVaultLogin: true,
+			wantVaultWrite: true,
+			wantIAMHit:     true,
+			wantMetaHit:    true,
+			putSecrets: map[string]interface{}{
+				"my-sec":       "456",
+				"my-other-sec": "wxyz",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+			  "client_secret": "abcd",  "refresh_token": "blah",
+		  "client_email": "",  "type": "service_account"}`),
+			},
+
+
+			// versioned secrets are contained under a 'data' key
+			wantSecrets: map[string]interface{}{
+				"data": map[string]interface{}{
+					"my-sec":       "456",
+					"my-other-sec": "wxyz",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				cfg           Config
+				gotVaultLogin bool
+				gotVaultWrite bool
+				gotIAMHit     bool
+				gotMetaHit    bool
+				secrets       map[string]interface{}
+			)
+			// ensure defaults are set
+			envconfig.Process("", &cfg)
+
+			secrets = test.startingSecrets
+
+			vaultSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPut:
+					gotVaultLogin = true
+					json.NewEncoder(w).Encode(api.Secret{
+						Auth: &api.SecretAuth{
+							ClientToken: "vault-test-token",
+						},
+					})
+				case http.MethodPost:
+					gotVaultWrite = true
+					var incoming map[string]interface{}
+					json.NewDecoder(r.Body).Decode(&incoming)
+					secrets = incoming
+				}
+			}))
+
+			iamSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotIAMHit = true
+				json.NewEncoder(w).Encode(iam.SignJwtResponse{
+					SignedJwt: "gcp-signed-jwt-for-vault",
+				})
+			}))
+			defer iamSvr.Close()
+
+			metaSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMetaHit = true
+				io.WriteString(w, test.givenEmail)
+			}))
+			defer metaSvr.Close()
+
+			if test.givenCreds != nil {
+				findDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+					return test.givenCreds, nil
+				}
+				defer func() {
+					findDefaultCredentials = google.FindDefaultCredentials
+				}()
+			}
+
+			cfg.AuthPath = test.givenCfg.AuthPath
+			cfg.SecretPath = test.givenCfg.SecretPath
+			cfg.LocalToken = test.givenCfg.LocalToken
+			cfg.IAMAddress = iamSvr.URL
+			cfg.MetadataAddress = metaSvr.URL
+			cfg.VaultAddress = vaultSvr.URL
+
+			if appengine.IsDevAppServer() {
+				t.Log("in an app engine environment, skipping non GAE test")
+				t.SkipNow()
+				return
+			}
+
+			ctx := context.Background()
+
+			err := PutVersionedSecrets(ctx, cfg, test.putSecrets)
+			if err != nil {
+				t.Errorf("expected no error, got err: %s", err)
+			}
+
+			if test.wantIAMHit != gotIAMHit {
+				t.Errorf("expected IAM hit? %t - got %t", test.wantIAMHit, gotIAMHit)
+			}
+			if test.wantMetaHit != gotMetaHit {
+				t.Errorf("expected Meta hit? %t - got %t", test.wantMetaHit, gotMetaHit)
+			}
+			if test.wantVaultLogin != gotVaultLogin {
+				t.Errorf("expected Vault login? %t - got %t", test.wantVaultLogin, gotVaultLogin)
+			}
+			if test.wantVaultWrite != gotVaultWrite {
+				t.Errorf("expected Vault write? %t - got %t", test.wantVaultWrite, gotVaultWrite)
+			}
+			if !cmp.Equal(test.wantSecrets, secrets) {
+				t.Errorf("secrets differ: (-want +got)\n%s", cmp.Diff(test.wantSecrets, secrets))
 			}
 		})
 	}
