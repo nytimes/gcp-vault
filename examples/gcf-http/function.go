@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	gcpvault "github.com/NYTimes/gcp-vault"
 	"github.com/NYTimes/gcp-vault/examples/nyt"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/GoogleCloudPlatform/berglas/pkg/berglas"
 )
 
 func init() {
@@ -24,6 +27,14 @@ func init() {
 var client nyt.Client
 
 func initClient(ctx context.Context) error {
+	if err := ReplaceEnvVarIfBerglas(ctx, "VAULT_ADDR"); err != nil {
+		return err
+	}
+
+	if err := ReplaceEnvVarIfBerglas(ctx, "VAULT_TOKEN"); err != nil {
+		return err
+	}
+
 	var cfg gcpvault.Config
 	envconfig.Process("", &cfg)
 
@@ -33,6 +44,17 @@ func initClient(ctx context.Context) error {
 	}
 
 	client = nyt.NewClient(nyt.DefaultHost, secrets["APIKey"].(string))
+	return nil
+}
+
+func ReplaceEnvVarIfBerglas(ctx, context.Context, envVar string) error {
+	val := os.Getenv(envVar)
+	if strings.HasPrefix(val, "berglas://") {
+		if err := berglas.Replace(ctx, envVar); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
