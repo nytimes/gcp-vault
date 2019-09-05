@@ -76,10 +76,6 @@ type Config struct {
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
 func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
-	if cfg.LocalToken != "" {
-		return getLocalSecrets(ctx, cfg)
-	}
-
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
@@ -138,6 +134,10 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 }
 
 func login(ctx context.Context, cfg Config) (*api.Client, error) {
+	if cfg.LocalToken != "" {
+		return newLocalClient(ctx, cfg)
+	}
+
 	vClient, err := newClient(ctx, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
@@ -170,7 +170,7 @@ func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	return api.NewClient(vcfg)
 }
 
-func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+func newLocalClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	vcfg := api.DefaultConfig()
 	vcfg.Address = cfg.VaultAddress
 	vcfg.HttpClient = getHTTPClient(ctx)
@@ -181,15 +181,7 @@ func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, e
 
 	vClient.SetToken(cfg.LocalToken)
 
-	// fetch secrets
-	secrets, err := vClient.Logical().Read(cfg.SecretPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get secrets")
-	}
-	if secrets == nil {
-		return nil, errors.New("no secrets found")
-	}
-	return secrets.Data, nil
+	return vClient, nil
 }
 
 func newJWT(ctx context.Context, cfg Config) (string, error) {
