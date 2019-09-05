@@ -115,7 +115,11 @@ func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{
 		return nil, err
 	}
 	// versioned secrets are contained under a 'data' key
-	return secs["data"].(map[string]interface{}), nil
+	s, ok := secs["data"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("no data in versioned secrets")
+	}
+	return s, nil
 }
 
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
