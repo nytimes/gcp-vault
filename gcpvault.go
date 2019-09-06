@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/api"
@@ -78,9 +79,6 @@ type Config struct {
 // this tool will expect the LocalToken to be set in some way.
 func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
 	checkDefaults(&cfg)
-	if cfg.LocalToken != "" {
-		return getLocalSecrets(ctx, cfg)
-	}
 
 	vClient, err := login(ctx, cfg)
 	if err != nil {
@@ -94,6 +92,10 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	}
 	if secrets == nil {
 		return nil, errors.New("no secrets found")
+	}
+	if (secrets.Data == nil || len(secrets.Data) == 0) && secrets.Warnings != nil {
+		err := errors.New(strings.Join(secrets.Warnings, ","))
+		return nil, errors.Wrap(err, "no secrets found")
 	}
 	return secrets.Data, nil
 }
@@ -119,7 +121,11 @@ func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{
 		return nil, err
 	}
 	// versioned secrets are contained under a 'data' key
-	return secs["data"].(map[string]interface{}), nil
+	s, ok := secs["data"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("no data in versioned secrets")
+	}
+	return s, nil
 }
 
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
@@ -131,7 +137,7 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 		return errors.Wrap(err, "unable to login to vault")
 	}
 
-	req := vClient.NewRequest(http.MethodPost, "v1/"+cfg.SecretPath)
+	req := vClient.NewRequest(http.MethodPost, "/v1/"+cfg.SecretPath)
 	req.BodyBytes, err = json.Marshal(map[string]map[string]interface{}{
 		"data": secrets,
 	})
@@ -153,6 +159,10 @@ func checkDefaults(cfg *Config) {
 }
 
 func login(ctx context.Context, cfg Config) (*api.Client, error) {
+	if cfg.LocalToken != "" {
+		return newLocalClient(ctx, cfg)
+	}
+
 	vClient, err := newClient(ctx, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
@@ -185,7 +195,7 @@ func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	return api.NewClient(vcfg)
 }
 
-func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+func newLocalClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	vcfg := api.DefaultConfig()
 	vcfg.Address = cfg.VaultAddress
 	vcfg.HttpClient = getHTTPClient(ctx)
@@ -196,15 +206,7 @@ func getLocalSecrets(ctx context.Context, cfg Config) (map[string]interface{}, e
 
 	vClient.SetToken(cfg.LocalToken)
 
-	// fetch secrets
-	secrets, err := vClient.Logical().Read(cfg.SecretPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get secrets")
-	}
-	if secrets == nil {
-		return nil, errors.New("no secrets found")
-	}
-	return secrets.Data, nil
+	return vClient, nil
 }
 
 func newJWT(ctx context.Context, cfg Config) (string, error) {
