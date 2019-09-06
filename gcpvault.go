@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/api"
@@ -92,6 +93,10 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 	}
 	if secrets == nil {
 		return nil, errors.New("no secrets found")
+	}
+	if (secrets.Data == nil || len(secrets.Data) == 0) && secrets.Warnings != nil {
+		err := errors.New(strings.Join(secrets.Warnings, ","))
+		return nil, errors.Wrap(err, "no secrets found")
 	}
 	return secrets.Data, nil
 }
