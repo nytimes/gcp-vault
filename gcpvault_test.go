@@ -301,7 +301,7 @@ func TestPutVersionedSecrets(t *testing.T) {
 		givenCfg        Config
 		startingSecrets map[string]interface{}
 		givenEmail      string
-		givenCreds    *google.Credentials
+		givenCreds      *google.Credentials
 
 		wantVaultLogin bool
 		wantVaultWrite bool
@@ -311,11 +311,35 @@ func TestPutVersionedSecrets(t *testing.T) {
 		wantSecrets    map[string]interface{}
 	}{
 		{
-			name: "GCP standard login, success",
-			givenEmail: "jp@example.com",
+			name: "local token, success",
+
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				LocalToken: "my-local-token",
+				SecretPath: "my-secret-path",
+			},
+			startingSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			wantVaultWrite: true,
+			putSecrets: map[string]interface{}{
+				"my-sec":       "456",
+				"my-other-sec": "wxyz",
+			},
+			// versioned secrets are contained under a 'data' key
+			wantSecrets: map[string]interface{}{
+				"data": map[string]interface{}{
+					"my-sec":       "456",
+					"my-other-sec": "wxyz",
+				},
+			},
+		},
+		{
+			name:       "GCP standard login, success",
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
 			},
 			startingSecrets: map[string]interface{}{
@@ -337,7 +361,6 @@ func TestPutVersionedSecrets(t *testing.T) {
 			  "client_secret": "abcd",  "refresh_token": "blah",
 		  "client_email": "",  "type": "service_account"}`),
 			},
-
 
 			// versioned secrets are contained under a 'data' key
 			wantSecrets: map[string]interface{}{
