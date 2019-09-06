@@ -39,17 +39,18 @@ type Config struct {
 
 	// AuthPath is the path the GCP authentication method is mounted at.
 	// Defaults to 'auth/gcp'.
-	AuthPath string `envconfig:"VAULT_GCP_PATH" default:"auth/gcp"`
+	AuthPath string `envconfig:"VAULT_GCP_PATH"`
 
 	// MaxRetries sets the number of retries that will be used in the case of certain
 	// errors. The underlying Vault client will pull this value out of the environment
 	// on it's own, but we're including it here so users can apply the same number of
 	// attempts towards signing the JWT with Google's IAM services.
-	MaxRetries int `envconfig:"VAULT_MAX_RETRIES" default:"2"`
+	MaxRetries int `envconfig:"VAULT_MAX_RETRIES"`
 
 	// IAMAddress is the location of the GCP IAM server.
 	// This should only used for testing.
 	IAMAddress string `envconfig:"IAM_ADDR"`
+
 	// MetadataAddress is the location of the GCP metadata
 	// This should only used for testing.
 	MetadataAddress string `envconfig:"METADATA_ADDR"`
@@ -77,6 +78,8 @@ type Config struct {
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
 func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+	checkDefaults(&cfg)
+
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
@@ -100,6 +103,7 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 // PutSecrets writes secrets to Vault at the configured path.
 // This is comparable to the `vault write` command.
 func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
+	checkDefaults(&cfg)
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
@@ -111,6 +115,7 @@ func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{})
 // GetVersionedSecrets reads versioned secrets from Vault.
 // This is comparable to the `vault kv get` command.
 func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+	checkDefaults(&cfg)
 	secs, err := GetSecrets(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -126,6 +131,7 @@ func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
 // This is comparable to the `vault kv put` command.
 func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
+	checkDefaults(&cfg)
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
@@ -140,6 +146,16 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 	}
 	_, err = vClient.RawRequestWithContext(ctx, req)
 	return errors.Wrap(err, "unable to make vault request")
+}
+
+func checkDefaults(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+
+	if cfg.AuthPath == "" {
+		cfg.AuthPath = "auth/gcp"
+	}
 }
 
 func login(ctx context.Context, cfg Config) (*api.Client, error) {
