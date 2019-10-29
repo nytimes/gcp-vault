@@ -21,7 +21,7 @@ func getDefaultServiceAccountEmail(ctx context.Context, cfg Config) (string, err
 }
 
 func callMetadataService(ctx context.Context, cfg Config) (string, error) {
-	c := getHTTPClient(ctx)
+	c := getHTTPClient(ctx, cfg)
 	if cfg.MetadataAddress == "" {
 		cfg.MetadataAddress = "http://metadata"
 	}
@@ -55,7 +55,10 @@ func callMetadataService(ctx context.Context, cfg Config) (string, error) {
 	return result, nil
 }
 
-func getHTTPClient(ctx context.Context) *http.Client {
+func getHTTPClient(ctx context.Context, cfg Config) *http.Client {
+	if cfg.HTTPClient != nil {
+		return cfg.HTTPClient
+	}
 	return &http.Client{
 		Transport: &http.Transport{
 			IdleConnTimeout: 1 * time.Second,
