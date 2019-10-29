@@ -14,6 +14,6 @@ func getDefaultServiceAccountEmail(ctx context.Context, cfg Config) (string, err
 	return appengine.ServiceAccount(ctx)
 }
 
-func getHTTPClient(ctx context.Context) *http.Client {
+func getHTTPClient(ctx context.Context, _ Config) *http.Client {
 	return urlfetch.Client(ctx)
 }

@@ -54,6 +54,11 @@ type Config struct {
 	// MetadataAddress is the location of the GCP metadata
 	// This should only used for testing.
 	MetadataAddress string `envconfig:"METADATA_ADDR"`
+
+	// HTTPClient can be optionally set if users wish to have more control over outbound
+	// HTTP requests made by this library. If not set, an http.Client with a 1s
+	// IdleConnTimeout will be used.
+	HTTPClient *http.Client
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -191,14 +196,14 @@ func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	vcfg := api.DefaultConfig()
 	vcfg.MaxRetries = cfg.MaxRetries
 	vcfg.Address = cfg.VaultAddress
-	vcfg.HttpClient = getHTTPClient(ctx)
+	vcfg.HttpClient = getHTTPClient(ctx, cfg)
 	return api.NewClient(vcfg)
 }
 
 func newLocalClient(ctx context.Context, cfg Config) (*api.Client, error) {
 	vcfg := api.DefaultConfig()
 	vcfg.Address = cfg.VaultAddress
-	vcfg.HttpClient = getHTTPClient(ctx)
+	vcfg.HttpClient = getHTTPClient(ctx, cfg)
 	vClient, err := api.NewClient(vcfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
@@ -239,7 +244,13 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 		return "", errors.Wrap(err, "unable to encode JWT payload")
 	}
 
-	iamClient, err := iam.New(oauth2.NewClient(ctx, tokenSource))
+	hc := getHTTPClient(ctx, cfg)
+	// reuse base transport but sprinkle on the token source for IAM access
+	hc.Transport = &oauth2.Transport{
+		Source: tokenSource,
+		Base:   hc.Transport,
+	}
+	iamClient, err := iam.New(hc)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to init IAM client")
 	}
