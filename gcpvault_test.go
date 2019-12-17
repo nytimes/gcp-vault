@@ -387,6 +387,8 @@ func TestPutVersionedSecrets(t *testing.T) {
 
 			secrets = test.startingSecrets
 
+			cachedClient = nil
+
 			vaultSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.Method {
 				case http.MethodPut:
