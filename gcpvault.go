@@ -61,6 +61,8 @@ type Config struct {
 	HTTPClient *http.Client
 }
 
+var cachedClient *api.Client
+
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
 // Vault.
 //
@@ -168,9 +170,20 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		return newLocalClient(ctx, cfg)
 	}
 
-	vClient, err := newClient(ctx, cfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to init vault client")
+	var err error
+	if cachedClient == nil {
+		cachedClient, err = newClient(ctx, cfg)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to init vault client")
+		}
+	}
+
+	if cachedClient.Token() != "" {
+		_, err := cachedClient.Auth().Token().LookupSelf()
+		if err == nil {
+			// lookup successful, token can still be used
+			return cachedClient, nil
+		}
 	}
 
 	// create signed JWT with our service account
@@ -180,16 +193,16 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 	}
 
 	// 'login' to vault using GCP auth
-	resp, err := vClient.Logical().Write(cfg.AuthPath+"/login", map[string]interface{}{
+	resp, err := cachedClient.Logical().Write(cfg.AuthPath+"/login", map[string]interface{}{
 		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to make login request")
 	}
 
-	vClient.SetToken(resp.Auth.ClientToken)
+	cachedClient.SetToken(resp.Auth.ClientToken)
 
-	return vClient, nil
+	return cachedClient, nil
 }
 
 func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
