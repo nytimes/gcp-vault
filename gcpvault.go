@@ -245,12 +245,11 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 	}
 
 	hc := getHTTPClient(ctx, cfg)
-	// reuse base transport and timeout but sprinkle on the token source for IAM access
+	// reuse timeout but sprinkle on the token source for IAM access
 	hcIAM := &http.Client{
 		Timeout: hc.Timeout,
 		Transport: &oauth2.Transport{
 			Source: tokenSource,
-			Base:   hc.Transport,
 		},
 	}
 	iamClient, err := iam.New(hcIAM)
