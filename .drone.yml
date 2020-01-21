@@ -12,16 +12,14 @@ workspace:
 
 steps:
 - name: mod-download
-  image: golang:1.12
+  image: golang:1.13
   commands:
   - go mod download
-  environment:
-    GOPROXY: https://proxy.golang.org
   depends_on:
   - clone
 
 - name: test
-  image: golang:1.12
+  image: golang:1.13
   commands:
   - go test -race -vet all -mod readonly ./...
   depends_on:

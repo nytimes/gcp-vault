@@ -7,7 +7,6 @@ require (
 	github.com/pkg/errors v0.8.0
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be
 	google.golang.org/api v0.0.0-20180921000521-920bb1beccf7
-	google.golang.org/appengine v1.4.0
 )
 
 go 1.13

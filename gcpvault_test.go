@@ -14,8 +14,6 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/iam/v1"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/aetest"
 )
 
 func TestGetSecrets(t *testing.T) {
@@ -27,7 +25,6 @@ func TestGetSecrets(t *testing.T) {
 		givenVaultErr bool
 		givenIAMErr   bool
 		givenMetaErr  bool
-		givenGAE      bool
 		givenCreds    *google.Credentials
 
 		wantVaultLogin bool
@@ -80,27 +77,6 @@ func TestGetSecrets(t *testing.T) {
 			wantVaultLogin: true,
 			wantIAMHit:     true,
 			wantMetaHit:    true,
-			wantSecrets: map[string]interface{}{
-				"my-sec":       "123",
-				"my-other-sec": "abcd",
-			},
-		},
-		{
-			name: "GAE standard login, success",
-
-			givenCfg: Config{
-				Role:       "my-gcp-role",
-				SecretPath: "my-secret-path",
-			},
-			givenSecrets: map[string]interface{}{
-				"my-sec":       "123",
-				"my-other-sec": "abcd",
-			},
-			givenGAE: true,
-
-			wantVaultRead:  true,
-			wantVaultLogin: true,
-			wantIAMHit:     true,
 			wantSecrets: map[string]interface{}{
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
@@ -243,29 +219,7 @@ func TestGetSecrets(t *testing.T) {
 			cfg.MetadataAddress = metaSvr.URL
 			cfg.VaultAddress = vaultSvr.URL
 
-			if appengine.IsDevAppServer() && !test.givenGAE {
-				t.Log("in an app engine environment, skipping non GAE test")
-				t.SkipNow()
-				return
-			}
-
 			ctx := context.Background()
-			if test.givenGAE {
-				if !appengine.IsDevAppServer() {
-					t.Log("skipping GAE test outside GAE environment")
-					t.SkipNow()
-					return
-				}
-				var (
-					err  error
-					done func()
-				)
-				ctx, done, err = aetest.NewContext()
-				if err != nil {
-					t.Fatalf("unable to start app engine %s", err)
-				}
-				defer done()
-			}
 
 			gotSecrets, gotErr := GetSecrets(ctx, cfg)
 			if test.wantErr != (gotErr != nil) {
@@ -433,12 +387,6 @@ func TestPutVersionedSecrets(t *testing.T) {
 			cfg.IAMAddress = iamSvr.URL
 			cfg.MetadataAddress = metaSvr.URL
 			cfg.VaultAddress = vaultSvr.URL
-
-			if appengine.IsDevAppServer() {
-				t.Log("in an app engine environment, skipping non GAE test")
-				t.SkipNow()
-				return
-			}
 
 			ctx := context.Background()
 
