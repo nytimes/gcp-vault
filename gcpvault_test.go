@@ -176,6 +176,24 @@ func TestGetSecrets(t *testing.T) {
 
 			wantErr: true,
 		},
+		{
+			name: "GCP standard login, meta retry fail",
+
+			givenEmail: "jp@example.com",
+			givenCreds: &google.Credentials{},
+			givenCfg: Config{
+				Role:       "my-gcp-role",
+				SecretPath: "my-secret-path",
+				MaxRetries: 3,
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenMetaErr: true,
+
+			wantErr: true,
+		},
 	}
 
 	for _, test := range tests {
