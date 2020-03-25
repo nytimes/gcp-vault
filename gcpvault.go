@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cenkalti/backoff"
 	"net/http"
 	"strings"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	iam "google.golang.org/api/iam/v1"
+	"google.golang.org/api/iam/v1"
 )
 
 // Config contains fields for configuring access and secrets retrieval from a Vault
@@ -219,13 +220,19 @@ func newJWT(ctx context.Context, cfg Config) (string, error) {
 		jwt string
 		err error
 	)
-	for retries := 0; retries <= cfg.MaxRetries; retries++ {
+
+	b := backoff.NewExponentialBackOff()
+
+	err = backoff.Retry(func() error {
 		jwt, err = newJWTBase(ctx, cfg)
-		if err == nil {
-			return jwt, nil
-		}
+		return err
+	}, backoff.WithMaxRetries(b, uint64(cfg.MaxRetries)))
+
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to sign JWT after %d retries", cfg.MaxRetries)
+	} else {
+		return jwt, nil
 	}
-	return "", errors.Wrapf(err, "unable to sign JWT after %d retries", cfg.MaxRetries)
 }
 
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
