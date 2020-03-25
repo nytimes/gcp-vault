@@ -35,6 +35,7 @@ func TestGetSecrets(t *testing.T) {
 		wantIAMHit     bool
 		wantMetaHit    bool
 		wantErr        bool
+		wantIAMRetry   bool
 		wantSecrets    map[string]interface{}
 	}{
 		{
@@ -193,6 +194,36 @@ func TestGetSecrets(t *testing.T) {
 			givenMetaErr: true,
 
 			wantErr: true,
+		},{
+			name: "GCP standard login, success after retry once",
+
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:       "my-gcp-role",
+				SecretPath: "my-secret-path",
+				MaxRetries: 1,
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:  true,
+			wantVaultLogin: true,
+			wantIAMHit:     true,
+			wantMetaHit:    true,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			wantIAMRetry: true,
 		},
 	}
 
@@ -231,6 +262,11 @@ func TestGetSecrets(t *testing.T) {
 			}
 
 			iamSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if test.wantIAMRetry {
+					test.wantIAMRetry = false
+					w.WriteHeader(http.StatusBadGateway)
+					return
+				}
 				gotIAMHit = true
 				json.NewEncoder(w).Encode(iam.SignJwtResponse{
 					SignedJwt: "gcp-signed-jwt-for-vault",
