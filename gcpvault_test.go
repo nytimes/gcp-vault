@@ -35,6 +35,7 @@ func TestGetSecrets(t *testing.T) {
 		wantIAMHit     bool
 		wantMetaHit    bool
 		wantErr        bool
+		wantIAMRetry   bool
 		wantSecrets    map[string]interface{}
 	}{
 		{
@@ -44,6 +45,7 @@ func TestGetSecrets(t *testing.T) {
 				Role:       "my-gcp-role",
 				LocalToken: "my-local-token",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -63,6 +65,7 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -91,6 +94,7 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -112,6 +116,7 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -127,6 +132,7 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -143,6 +149,7 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -160,6 +167,7 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
+				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -168,6 +176,54 @@ func TestGetSecrets(t *testing.T) {
 			givenMetaErr: true,
 
 			wantErr: true,
+		},
+		{
+			name: "GCP standard login, meta retry fail",
+
+			givenEmail: "jp@example.com",
+			givenCreds: &google.Credentials{},
+			givenCfg: Config{
+				Role:       "my-gcp-role",
+				SecretPath: "my-secret-path",
+				MaxRetries: 3,
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenMetaErr: true,
+
+			wantErr: true,
+		},{
+			name: "GCP standard login, success after retry once",
+
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:       "my-gcp-role",
+				SecretPath: "my-secret-path",
+				MaxRetries: 1,
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:  true,
+			wantVaultLogin: true,
+			wantIAMHit:     true,
+			wantMetaHit:    true,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			wantIAMRetry: true,
 		},
 	}
 
@@ -206,6 +262,11 @@ func TestGetSecrets(t *testing.T) {
 			}
 
 			iamSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if test.wantIAMRetry {
+					test.wantIAMRetry = false
+					w.WriteHeader(http.StatusBadGateway)
+					return
+				}
 				gotIAMHit = true
 				json.NewEncoder(w).Encode(iam.SignJwtResponse{
 					SignedJwt: "gcp-signed-jwt-for-vault",
@@ -239,6 +300,7 @@ func TestGetSecrets(t *testing.T) {
 			cfg.AuthPath = test.givenCfg.AuthPath
 			cfg.SecretPath = test.givenCfg.SecretPath
 			cfg.LocalToken = test.givenCfg.LocalToken
+			cfg.MaxRetries = test.givenCfg.MaxRetries
 			cfg.IAMAddress = iamSvr.URL
 			cfg.MetadataAddress = metaSvr.URL
 			cfg.VaultAddress = vaultSvr.URL
