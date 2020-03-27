@@ -45,7 +45,6 @@ func TestGetSecrets(t *testing.T) {
 				Role:       "my-gcp-role",
 				LocalToken: "my-local-token",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -65,7 +64,6 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -94,7 +92,6 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -116,7 +113,6 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -132,7 +128,6 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -149,7 +144,6 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -167,7 +161,6 @@ func TestGetSecrets(t *testing.T) {
 			givenCfg: Config{
 				Role:       "my-gcp-role",
 				SecretPath: "my-secret-path",
-				MaxRetries: 1,
 			},
 			givenSecrets: map[string]interface{}{
 				"my-sec":       "123",
@@ -191,7 +184,7 @@ func TestGetSecrets(t *testing.T) {
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
 			},
-			givenMetaErr: true,
+			givenIAMErr: true,
 
 			wantErr: true,
 		},{

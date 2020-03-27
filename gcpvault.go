@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cenkalti/backoff"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
@@ -230,9 +230,9 @@ func newJWT(ctx context.Context, cfg Config) (string, error) {
 
 	if err != nil {
 		return "", errors.Wrapf(err, "unable to sign JWT after %d retries", cfg.MaxRetries)
-	} else {
-		return jwt, nil
 	}
+
+	return jwt, nil
 }
 
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
