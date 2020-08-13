@@ -60,6 +60,16 @@ type Config struct {
 	// HTTP requests made by this library. If not set, an http.Client with a 1s
 	// IdleConnTimeout will be used.
 	HTTPClient *http.Client
+
+	// GCS bucket location where token can be stored for caching purposes
+	CachedToken string `envconfig:"VAULT_CACHED_TOKEN"`
+	//How often token should be refreshed (in minutes). Default is 120 min.
+	CachedTokenRefreshThreshold int `envconfig:"VAULT_CACHED_TOKEN_REFRESHED_THRESHOLD"`
+}
+
+type TokenCache interface {
+	GetToken(ctx context.Context) (string, error)
+	SaveToken(token string) error
 }
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -83,10 +93,10 @@ type Config struct {
 //
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
-func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+func GetSecrets(ctx context.Context, cfg Config, tokenCache TokenCache) (map[string]interface{}, error) {
 	checkDefaults(&cfg)
 
-	vClient, err := login(ctx, cfg)
+	vClient, err := login(ctx, cfg, tokenCache)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
 	}
@@ -108,9 +118,9 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 
 // PutSecrets writes secrets to Vault at the configured path.
 // This is comparable to the `vault write` command.
-func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
+func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}, tokenCache TokenCache) error {
 	checkDefaults(&cfg)
-	vClient, err := login(ctx, cfg)
+	vClient, err := login(ctx, cfg, tokenCache)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
 	}
@@ -120,9 +130,9 @@ func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{})
 
 // GetVersionedSecrets reads versioned secrets from Vault.
 // This is comparable to the `vault kv get` command.
-func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
+func GetVersionedSecrets(ctx context.Context, cfg Config, tokenCache TokenCache) (map[string]interface{}, error) {
 	checkDefaults(&cfg)
-	secs, err := GetSecrets(ctx, cfg)
+	secs, err := GetSecrets(ctx, cfg, tokenCache)
 	if err != nil {
 		return nil, err
 	}
@@ -136,9 +146,9 @@ func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{
 
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
 // This is comparable to the `vault kv put` command.
-func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
+func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}, tokenCache TokenCache) error {
 	checkDefaults(&cfg)
-	vClient, err := login(ctx, cfg)
+	vClient, err := login(ctx, cfg, tokenCache)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
 	}
@@ -164,7 +174,7 @@ func checkDefaults(cfg *Config) {
 	}
 }
 
-func login(ctx context.Context, cfg Config) (*api.Client, error) {
+func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client, error) {
 	if cfg.LocalToken != "" {
 		return newLocalClient(ctx, cfg)
 	}
@@ -174,10 +184,35 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
+	cachedToken := ""
+	if tokenCache != nil {
+		cachedToken, err = tokenCache.GetToken(ctx)
+		//todo error checking
+	}
+
+	if cachedToken == "" {
+
+		//renew token if expired or not in cache
+		token, err := getToken(ctx, cfg, vClient)
+		if err != nil {
+			return nil, err
+		}
+
+		vClient.SetToken(token)
+		if tokenCache != nil {
+			tokenCache.SaveToken(token)
+		}
+	}
+
+	return vClient, nil
+}
+
+func getToken(ctx context.Context, cfg Config, vClient *api.Client) (string, error) {
+
 	// create signed JWT with our service account
 	jwt, err := newJWT(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create JWT")
+		return "", errors.Wrap(err, "unable to create JWT")
 	}
 
 	// 'login' to vault using GCP auth
@@ -185,12 +220,10 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to make login request")
+		return "", errors.Wrap(err, "unable to make login request")
 	}
 
-	vClient.SetToken(resp.Auth.ClientToken)
-
-	return vClient, nil
+	return resp.Auth.ClientToken, nil
 }
 
 func newClient(ctx context.Context, cfg Config) (*api.Client, error) {

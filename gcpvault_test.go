@@ -187,7 +187,7 @@ func TestGetSecrets(t *testing.T) {
 			givenIAMErr: true,
 
 			wantErr: true,
-		},{
+		}, {
 			name: "GCP standard login, success after retry once",
 
 			givenEmail: "jp@example.com",
@@ -322,7 +322,7 @@ func TestGetSecrets(t *testing.T) {
 				defer done()
 			}
 
-			gotSecrets, gotErr := GetSecrets(ctx, cfg)
+			gotSecrets, gotErr := GetSecrets(ctx, cfg, &TokenCacheGCS{cfg: cfg})
 			if test.wantErr != (gotErr != nil) {
 				t.Errorf("expected error %t, but got %s", test.wantErr, gotErr)
 			}
@@ -497,7 +497,7 @@ func TestPutVersionedSecrets(t *testing.T) {
 
 			ctx := context.Background()
 
-			err := PutVersionedSecrets(ctx, cfg, test.putSecrets)
+			err := PutVersionedSecrets(ctx, cfg, test.putSecrets, &TokenCacheGCS{cfg: cfg})
 			if err != nil {
 				t.Errorf("expected no error, got err: %s", err)
 			}
