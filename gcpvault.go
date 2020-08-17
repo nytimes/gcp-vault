@@ -75,7 +75,6 @@ type TokenCache interface {
 
 type Token struct {
 	Token   string
-	Created time.Time
 	Expires time.Time
 }
 
@@ -208,15 +207,24 @@ func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client,
 
 	}
 
+	//capture start time for token expiration
+	now := time.Now()
+
 	//renew token since expired or not in cache
 	token, err := getToken(ctx, cfg, vClient)
 	if err != nil {
 		return nil, err
 	}
 
-	vClient.SetToken(token)
+	vClient.SetToken(token.Auth.ClientToken)
+	//save to cache
 	if tokenCache != nil {
-		err = tokenCache.SaveToken(Token{}) //todo finish variables
+		tokenExpiration, err := token.TokenTTL()
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to retrieve token ttl")
+		}
+
+		err = tokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
 		}
@@ -225,12 +233,12 @@ func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client,
 	return vClient, nil
 }
 
-func getToken(ctx context.Context, cfg Config, vClient *api.Client) (string, error) {
+func getToken(ctx context.Context, cfg Config, vClient *api.Client) (*api.Secret, error) {
 
 	// create signed JWT with our service account
 	jwt, err := newJWT(ctx, cfg)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to create JWT")
+		return nil, errors.Wrap(err, "unable to create JWT")
 	}
 
 	// 'login' to vault using GCP auth
@@ -238,10 +246,10 @@ func getToken(ctx context.Context, cfg Config, vClient *api.Client) (string, err
 		"role": cfg.Role, "jwt": jwt,
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "unable to make login request")
+		return nil, errors.Wrap(err, "unable to make login request")
 	}
 
-	return resp.Auth.ClientToken, nil
+	return resp, nil
 }
 
 func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
@@ -373,7 +381,7 @@ func isExpired(token *Token, cfg Config) bool {
 		cfg.CachedTokenRefreshThreshold = CachedTokenRefreshThresholdDefault
 	}
 
-	refreshTime := token.Created.Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
+	refreshTime := time.Now().Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
 	//adding random number of seconds to the expiration to avoid many simultaneous refresh events
 	refreshTime = refreshTime.Add(time.Second * time.Duration(rand.Intn(100)))
 
