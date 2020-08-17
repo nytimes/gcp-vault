@@ -63,9 +63,12 @@ type Config struct {
 	HTTPClient *http.Client
 
 	// GCS bucket location where token can be stored for caching purposes
-	CachedToken string `envconfig:"VAULT_CACHED_TOKEN"`
+	TokenCacheStorageGCS         string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
+	TokenCacheStorageMemoryStore string `envconfig:"TOKEN_CACHE_STORAGE_MEMORY_STORE"`
 	//How often token should be refreshed (in minutes). Default is 120 min.
 	CachedTokenRefreshThreshold int `envconfig:"VAULT_CACHED_TOKEN_REFRESHED_THRESHOLD"`
+
+	TokenCache TokenCache
 }
 
 type TokenCache interface {
@@ -103,10 +106,10 @@ const (
 //
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
-func GetSecrets(ctx context.Context, cfg Config, tokenCache TokenCache) (map[string]interface{}, error) {
+func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
 	checkDefaults(&cfg)
 
-	vClient, err := login(ctx, cfg, tokenCache)
+	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to login to vault")
 	}
@@ -128,9 +131,9 @@ func GetSecrets(ctx context.Context, cfg Config, tokenCache TokenCache) (map[str
 
 // PutSecrets writes secrets to Vault at the configured path.
 // This is comparable to the `vault write` command.
-func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}, tokenCache TokenCache) error {
+func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
 	checkDefaults(&cfg)
-	vClient, err := login(ctx, cfg, tokenCache)
+	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
 	}
@@ -140,9 +143,9 @@ func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{},
 
 // GetVersionedSecrets reads versioned secrets from Vault.
 // This is comparable to the `vault kv get` command.
-func GetVersionedSecrets(ctx context.Context, cfg Config, tokenCache TokenCache) (map[string]interface{}, error) {
+func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
 	checkDefaults(&cfg)
-	secs, err := GetSecrets(ctx, cfg, tokenCache)
+	secs, err := GetSecrets(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -156,9 +159,9 @@ func GetVersionedSecrets(ctx context.Context, cfg Config, tokenCache TokenCache)
 
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
 // This is comparable to the `vault kv put` command.
-func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}, tokenCache TokenCache) error {
+func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
 	checkDefaults(&cfg)
-	vClient, err := login(ctx, cfg, tokenCache)
+	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
 	}
@@ -182,9 +185,18 @@ func checkDefaults(cfg *Config) {
 	if cfg.AuthPath == "" {
 		cfg.AuthPath = "auth/gcp"
 	}
+
+	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCache == nil {
+		cfg.TokenCache = TokenCacheGCS{}
+	}
+
+	if cfg.TokenCacheStorageMemoryStore != "" && cfg.TokenCache == nil {
+		//TODO this should change to memory store
+		cfg.TokenCache = TokenCacheGCS{}
+	}
 }
 
-func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client, error) {
+func login(ctx context.Context, cfg Config) (*api.Client, error) {
 	if cfg.LocalToken != "" {
 		return newLocalClient(ctx, cfg)
 	}
@@ -194,8 +206,8 @@ func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client,
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
-	if tokenCache != nil {
-		token, err := tokenCache.GetToken(ctx)
+	if cfg.TokenCache != nil {
+		token, err := cfg.TokenCache.GetToken(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve Vault token from cache")
 		}
@@ -218,13 +230,13 @@ func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client,
 
 	vClient.SetToken(token.Auth.ClientToken)
 	//save to cache
-	if tokenCache != nil {
+	if cfg.TokenCache != nil {
 		tokenExpiration, err := token.TokenTTL()
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve token ttl")
 		}
 
-		err = tokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
+		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
 		}
