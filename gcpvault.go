@@ -376,6 +376,11 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 }
 
 func isExpired(token *Token, cfg Config) bool {
+
+	if token == nil {
+		return true
+	}
+
 	//if expiration is not set, use default
 	if cfg.CachedTokenRefreshThreshold == 0 {
 		cfg.CachedTokenRefreshThreshold = CachedTokenRefreshThresholdDefault
