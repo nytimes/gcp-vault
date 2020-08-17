@@ -322,7 +322,7 @@ func TestGetSecrets(t *testing.T) {
 				defer done()
 			}
 
-			gotSecrets, gotErr := GetSecrets(ctx, cfg, &TokenCacheGCS{cfg: cfg})
+			gotSecrets, gotErr := GetSecrets(ctx, cfg, nil)
 			if test.wantErr != (gotErr != nil) {
 				t.Errorf("expected error %t, but got %s", test.wantErr, gotErr)
 			}
@@ -497,7 +497,7 @@ func TestPutVersionedSecrets(t *testing.T) {
 
 			ctx := context.Background()
 
-			err := PutVersionedSecrets(ctx, cfg, test.putSecrets, &TokenCacheGCS{cfg: cfg})
+			err := PutVersionedSecrets(ctx, cfg, test.putSecrets, nil)
 			if err != nil {
 				t.Errorf("expected no error, got err: %s", err)
 			}
@@ -516,6 +516,187 @@ func TestPutVersionedSecrets(t *testing.T) {
 			}
 			if !cmp.Equal(test.wantSecrets, secrets) {
 				t.Errorf("secrets differ: (-want +got)\n%s", cmp.Diff(test.wantSecrets, secrets))
+			}
+		})
+	}
+}
+
+func TestGetSecretsCached(t *testing.T) {
+	tests := []struct {
+		name          string
+		givenCfg      Config
+		givenSecrets  map[string]interface{}
+		givenEmail    string
+		givenVaultErr bool
+		givenIAMErr   bool
+		givenMetaErr  bool
+		givenGAE      bool
+		givenCreds    *google.Credentials
+
+		wantVaultLogin bool
+		wantVaultRead  bool
+		wantIAMHit     bool
+		wantMetaHit    bool
+		wantErr        bool
+		wantIAMRetry   bool
+		wantSecrets    map[string]interface{}
+	}{
+		{
+			name: "GCP standard login, success",
+
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:       "my-gcp-role",
+				SecretPath: "my-secret-path",
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:  true,
+			wantVaultLogin: true,
+			wantIAMHit:     true,
+			wantMetaHit:    true,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				cfg           Config
+				gotVaultLogin bool
+				gotVaultRead  bool
+				gotIAMHit     bool
+				gotMetaHit    bool
+			)
+			// ensure defaults are set
+			envconfig.Process("", &cfg)
+
+			vaultSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodGet:
+					gotVaultRead = true
+					json.NewEncoder(w).Encode(api.Secret{
+						Data: test.givenSecrets,
+					})
+				case http.MethodPut:
+					gotVaultLogin = true
+					json.NewEncoder(w).Encode(api.Secret{
+						Auth: &api.SecretAuth{
+							ClientToken: "vault-test-token",
+						},
+					})
+				}
+			}))
+			if test.givenVaultErr {
+				vaultSvr.Close()
+			} else {
+				defer vaultSvr.Close()
+			}
+
+			iamSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if test.wantIAMRetry {
+					test.wantIAMRetry = false
+					w.WriteHeader(http.StatusBadGateway)
+					return
+				}
+				gotIAMHit = true
+				json.NewEncoder(w).Encode(iam.SignJwtResponse{
+					SignedJwt: "gcp-signed-jwt-for-vault",
+				})
+			}))
+			if test.givenIAMErr {
+				iamSvr.Close()
+			} else {
+				defer iamSvr.Close()
+			}
+
+			metaSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMetaHit = true
+				io.WriteString(w, test.givenEmail)
+			}))
+			if test.givenMetaErr {
+				metaSvr.Close()
+			} else {
+				defer metaSvr.Close()
+			}
+
+			if test.givenCreds != nil {
+				findDefaultCredentials = func(ctx context.Context, scopes ...string) (*google.Credentials, error) {
+					return test.givenCreds, nil
+				}
+				defer func() {
+					findDefaultCredentials = google.FindDefaultCredentials
+				}()
+			}
+
+			cfg.AuthPath = test.givenCfg.AuthPath
+			cfg.SecretPath = test.givenCfg.SecretPath
+			cfg.LocalToken = test.givenCfg.LocalToken
+			cfg.MaxRetries = test.givenCfg.MaxRetries
+			cfg.IAMAddress = iamSvr.URL
+			cfg.MetadataAddress = metaSvr.URL
+			cfg.VaultAddress = vaultSvr.URL
+
+			if appengine.IsDevAppServer() && !test.givenGAE {
+				t.Log("in an app engine environment, skipping non GAE test")
+				t.SkipNow()
+				return
+			}
+
+			ctx := context.Background()
+			if test.givenGAE {
+				if !appengine.IsDevAppServer() {
+					t.Log("skipping GAE test outside GAE environment")
+					t.SkipNow()
+					return
+				}
+				var (
+					err  error
+					done func()
+				)
+				ctx, done, err = aetest.NewContext()
+				if err != nil {
+					t.Fatalf("unable to start app engine %s", err)
+				}
+				defer done()
+			}
+
+			gotSecrets, gotErr := GetSecrets(ctx, cfg, nil)
+			if test.wantErr != (gotErr != nil) {
+				t.Errorf("expected error %t, but got %s", test.wantErr, gotErr)
+			}
+			if test.wantErr {
+				return
+			}
+
+			if test.wantIAMHit != gotIAMHit {
+				t.Errorf("expected IAM hit? %t - got %t", test.wantIAMHit, gotIAMHit)
+			}
+			if test.wantMetaHit != gotMetaHit {
+				t.Errorf("expected Meta hit? %t - got %t", test.wantMetaHit, gotMetaHit)
+			}
+			if test.wantVaultRead != gotVaultRead {
+				t.Errorf("expected Vault read? %t - got %t", test.wantVaultRead, gotVaultRead)
+			}
+			if test.wantVaultLogin != gotVaultLogin {
+				t.Errorf("expected Vault login? %t - got %t", test.wantVaultLogin, gotVaultLogin)
+			}
+
+			if !cmp.Equal(test.wantSecrets, gotSecrets) {
+				t.Errorf("secrets differ: (-want +got)\n%s", cmp.Diff(test.wantSecrets, gotSecrets))
 			}
 		})
 	}

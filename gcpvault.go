@@ -70,7 +70,7 @@ type Config struct {
 
 type TokenCache interface {
 	GetToken(ctx context.Context) (*Token, error)
-	SaveToken(token string) error
+	SaveToken(token Token) error
 }
 
 type Token struct {
@@ -216,7 +216,7 @@ func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client,
 
 	vClient.SetToken(token)
 	if tokenCache != nil {
-		err = tokenCache.SaveToken(token)
+		err = tokenCache.SaveToken(Token{}) //todo finish variables
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
 		}

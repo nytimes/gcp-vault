@@ -13,14 +13,15 @@ type TokenCacheGCS struct {
 	cfg Config
 }
 
-func (t TokenCacheGCS) GetToken(ctx context.Context) (Token, error) {
+func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
 
 	if t.cfg.CachedToken != "" {
+		//TODO retrieve JSON from bucket and convert to Token object
 		bucket := "bucket-name"
 		object := "object-name"
 		client, err := storage.NewClient(ctx)
 		if err != nil {
-			return Token{}, fmt.Errorf("storage.NewClient: %v", err)
+			return nil, fmt.Errorf("storage.NewClient: %v", err)
 		}
 		defer client.Close()
 
@@ -29,21 +30,21 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (Token, error) {
 
 		rc, err := client.Bucket(bucket).Object(object).NewReader(ctx)
 		if err != nil {
-			return Token{}, fmt.Errorf("Object(%q).NewReader: %v", object, err)
+			return nil, fmt.Errorf("Object(%q).NewReader: %v", object, err)
 		}
 		defer rc.Close()
 
-		return Token{}, nil
+		return &Token{Token: "AAA"}, nil
 	}
 
-	return Token{}, nil
+	return nil, nil
 
 }
 
 func (t TokenCacheGCS) SaveToken(token string) error {
 
 	if t.cfg.CachedToken != "" {
-
+		//TODO create json file.
 		bucket := "bucket-name"
 		object := "object-name"
 		//TODO change above
