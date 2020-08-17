@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"time"
 )
@@ -14,14 +13,14 @@ type TokenCacheGCS struct {
 	cfg Config
 }
 
-func (t TokenCacheGCS) GetToken(ctx context.Context) (string, error) {
+func (t TokenCacheGCS) GetToken(ctx context.Context) (Token, error) {
 
 	if t.cfg.CachedToken != "" {
 		bucket := "bucket-name"
 		object := "object-name"
 		client, err := storage.NewClient(ctx)
 		if err != nil {
-			return "", fmt.Errorf("storage.NewClient: %v", err)
+			return Token{}, fmt.Errorf("storage.NewClient: %v", err)
 		}
 		defer client.Close()
 
@@ -30,19 +29,14 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (string, error) {
 
 		rc, err := client.Bucket(bucket).Object(object).NewReader(ctx)
 		if err != nil {
-			return "", fmt.Errorf("Object(%q).NewReader: %v", object, err)
+			return Token{}, fmt.Errorf("Object(%q).NewReader: %v", object, err)
 		}
 		defer rc.Close()
 
-		data, err := ioutil.ReadAll(rc)
-		if err != nil {
-			return "", fmt.Errorf("ioutil.ReadAll: %v", err)
-		}
-
-		return data, nil
+		return Token{}, nil
 	}
 
-	return "", nil
+	return Token{}, nil
 
 }
 

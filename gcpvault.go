@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -68,9 +69,19 @@ type Config struct {
 }
 
 type TokenCache interface {
-	GetToken(ctx context.Context) (string, error)
+	GetToken(ctx context.Context) (*Token, error)
 	SaveToken(token string) error
 }
+
+type Token struct {
+	Token   string
+	Created time.Time
+	Expires time.Time
+}
+
+const (
+	CachedTokenRefreshThresholdDefault = 120
+)
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
 // Vault.
@@ -184,23 +195,30 @@ func login(ctx context.Context, cfg Config, tokenCache TokenCache) (*api.Client,
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
 
-	cachedToken := ""
 	if tokenCache != nil {
-		cachedToken, err = tokenCache.GetToken(ctx)
-		//todo error checking
-	}
-
-	if cachedToken == "" {
-
-		//renew token if expired or not in cache
-		token, err := getToken(ctx, cfg, vClient)
+		token, err := tokenCache.GetToken(ctx)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "unable to retrieve Vault token from cache")
 		}
 
-		vClient.SetToken(token)
-		if tokenCache != nil {
-			tokenCache.SaveToken(token)
+		if !isExpired(token, cfg) {
+			vClient.SetToken(token.Token)
+			return vClient, nil
+		}
+
+	}
+
+	//renew token since expired or not in cache
+	token, err := getToken(ctx, cfg, vClient)
+	if err != nil {
+		return nil, err
+	}
+
+	vClient.SetToken(token)
+	if tokenCache != nil {
+		err = tokenCache.SaveToken(token)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to save token to cache")
 		}
 	}
 
@@ -347,4 +365,21 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 	}
 
 	return data["client_email"], nil
+}
+
+func isExpired(token *Token, cfg Config) bool {
+	//if expiration is not set, use default
+	if cfg.CachedTokenRefreshThreshold == 0 {
+		cfg.CachedTokenRefreshThreshold = CachedTokenRefreshThresholdDefault
+	}
+
+	refreshTime := token.Created.Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
+	//adding random number of seconds to the expiration to avoid many simultaneous refresh events
+	refreshTime = refreshTime.Add(time.Second * time.Duration(rand.Intn(100)))
+
+	if refreshTime.After(token.Expires) {
+		return true
+	}
+
+	return false
 }
