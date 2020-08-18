@@ -233,8 +233,14 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve token ttl")
 		}
-		log.Print("now: ", now)
-		log.Print("tokenTTL: ", tokenExpiration)
+		location, err := time.LoadLocation("EST")
+		if err != nil {
+			fmt.Println(err)
+		}
+		log.Printf("isExpired: refreshTime with offset =%s", now.Add(tokenExpiration).In(location))
+		log.Print("Token duration is %v", token.Auth.LeaseDuration)
+		log.Print("Now is %v", now.In(location))
+
 		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
