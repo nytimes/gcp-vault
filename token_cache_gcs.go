@@ -11,7 +11,7 @@ import (
 )
 
 type TokenCacheGCS struct {
-	cfg Config
+	cfg *Config
 }
 
 func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
