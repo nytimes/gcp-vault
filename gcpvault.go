@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -214,14 +215,16 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 
 		if !isExpired(token, cfg) {
 			vClient.SetToken(token.Token)
+			log.Print("Retrieved token from cache.")
 			return vClient, nil
 		}
+		log.Print("Token in cache is expired.")
 
 	}
 
 	//capture start time for token expiration
 	now := time.Now()
-
+	log.Print("Getting new token from Vault")
 	//renew token since expired or not in cache
 	token, err := getToken(ctx, cfg, vClient)
 	if err != nil {
