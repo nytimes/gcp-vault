@@ -1,4 +1,4 @@
-module github.com/NYTimes/gcp-vault
+module github.com/alex-khordos/gcp-vault
 
 require (
 	cloud.google.com/go v0.63.0 // indirect
