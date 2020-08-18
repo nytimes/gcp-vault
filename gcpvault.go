@@ -233,15 +233,12 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve token ttl")
 		}
-		location, err := time.LoadLocation("EST")
-		if err != nil {
-			fmt.Println(err)
-		}
-		log.Printf("Expiration time %s", now.Add(time.Second*tokenExpiration).In(location))
-		log.Print("Token duration is %v", token.Auth.LeaseDuration)
-		log.Print("Now is %v", now.In(location))
 
-		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(time.Second * tokenExpiration)})
+		log.Print("Now is %v", now)
+		log.Printf("Expiration time %s", now.Add(tokenExpiration))
+		log.Print("Token duration is %v", token.Auth.LeaseDuration)
+
+		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
 		}
@@ -394,11 +391,6 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 
 func isExpired(token *Token, cfg Config) bool {
 
-	location, err := time.LoadLocation("EST")
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	if token == nil {
 		log.Println("isExpired: nil token")
 		return true
@@ -410,13 +402,13 @@ func isExpired(token *Token, cfg Config) bool {
 	}
 
 	refreshTime := time.Now().Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
-	log.Printf("isExpired: refreshTime =%s", refreshTime.In(location))
+	log.Printf("isExpired: refreshTime =%s", refreshTime)
 	//seed random generator
 	rand.Seed(time.Now().UnixNano())
 	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events
 	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(60))))
-	log.Printf("isExpired: refreshTime with offset =%s", refreshTime.In(location))
-	log.Printf("isExpired: token expiration =%s", token.Expires.In(location))
+	log.Printf("isExpired: refreshTime with offset =%s", refreshTime)
+	log.Printf("isExpired: token expiration =%s", token.Expires)
 
 	if refreshTime.After(token.Expires) {
 		log.Println("isExpired: expired")
