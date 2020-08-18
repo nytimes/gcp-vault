@@ -190,11 +190,6 @@ func checkDefaults(cfg *Config) {
 	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCache == nil {
 		cfg.TokenCache = TokenCacheGCS{}
 	}
-
-	if cfg.TokenCacheStorageMemoryStore != "" && cfg.TokenCache == nil {
-		//TODO this should change to memory store
-		cfg.TokenCache = TokenCacheGCS{}
-	}
 }
 
 func login(ctx context.Context, cfg Config) (*api.Client, error) {
@@ -402,8 +397,10 @@ func isExpired(token *Token, cfg Config) bool {
 	}
 
 	refreshTime := time.Now().Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
-	//adding random number of seconds to the expiration to avoid many simultaneous refresh events
-	refreshTime = refreshTime.Add(time.Second * time.Duration(rand.Intn(100)))
+	//seed random generator
+	rand.Seed(time.Now().UnixNano())
+	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events
+	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(60))))
 
 	if refreshTime.After(token.Expires) {
 		return true
