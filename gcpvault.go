@@ -66,7 +66,7 @@ type Config struct {
 	// GCS bucket location where token can be stored for caching purposes
 	TokenCacheStorageGCS         string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
 	TokenCacheStorageMemoryStore string `envconfig:"TOKEN_CACHE_STORAGE_MEMORY_STORE"`
-	//How often token should be refreshed (in minutes). Default is 120 min.
+	//How often token should be refreshed (in minutes). Default is 15 min.
 	CachedTokenRefreshThreshold int `envconfig:"VAULT_CACHED_TOKEN_REFRESHED_THRESHOLD"`
 
 	TokenCache TokenCache
@@ -83,7 +83,7 @@ type Token struct {
 }
 
 const (
-	CachedTokenRefreshThresholdDefault = 120
+	CachedTokenRefreshThresholdDefault = 15
 )
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
