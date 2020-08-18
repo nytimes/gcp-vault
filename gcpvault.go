@@ -387,6 +387,11 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 
 func isExpired(token *Token, cfg Config) bool {
 
+	location, err := time.LoadLocation("EST")
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	if token == nil {
 		log.Println("isExpired: nil token")
 		return true
@@ -398,13 +403,13 @@ func isExpired(token *Token, cfg Config) bool {
 	}
 
 	refreshTime := time.Now().Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
-	log.Printf("isExpired: refreshTime=%s", refreshTime)
+	log.Printf("isExpired: refreshTime =%s", refreshTime.In(location))
 	//seed random generator
 	rand.Seed(time.Now().UnixNano())
 	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events
 	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(60))))
-	log.Printf("isExpired: refreshTime=%s", refreshTime)
-	log.Printf("isExpired: expires=%s", token.Expires)
+	log.Printf("isExpired: refreshTime with offset =%s", refreshTime.In(location))
+	log.Printf("isExpired: token expiration =%s", token.Expires.In(location))
 
 	if refreshTime.After(token.Expires) {
 		log.Println("isExpired: expired")
