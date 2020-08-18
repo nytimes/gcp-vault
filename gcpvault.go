@@ -233,7 +233,8 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve token ttl")
 		}
-
+		log.Print("now: ", now)
+		log.Print("tokenTTL: ", tokenExpiration)
 		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
