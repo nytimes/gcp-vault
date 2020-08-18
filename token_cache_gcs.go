@@ -30,7 +30,8 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
 
 		rc, err := client.Bucket(bucket).Object(object).NewReader(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("Object(%q).NewReader: %v", object, err)
+			// swallowing the error here since we may not have cached a token yet
+			return nil, nil
 		}
 		defer rc.Close()
 
@@ -56,7 +57,7 @@ func (t TokenCacheGCS) SaveToken(token Token) error {
 
 		bucket := t.cfg.TokenCacheStorageGCS
 		object := "token-cache"
-		//TODO change above
+
 		ctx := context.Background()
 		client, err := storage.NewClient(ctx)
 		if err != nil {
