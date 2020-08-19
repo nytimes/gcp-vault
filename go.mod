@@ -16,7 +16,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.3.0
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
