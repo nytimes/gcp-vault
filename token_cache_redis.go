@@ -9,8 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var redisPool *redis.Pool
-
 type TokenCacheRedis struct {
 	cfg *Config
 }
@@ -20,12 +18,12 @@ func (t TokenCacheRedis) GetToken(ctx context.Context) (*Token, error) {
 	if t.cfg.TokenCache != nil {
 
 		redisAddr := t.cfg.TokenCacheStorageRedis
-		log.Printf("Redis address is:", redisAddr)
-		redisPool = redis.NewPool(func() (redis.Conn, error) {
-			return redis.Dial("tcp", redisAddr)
-		}, 1)
-		log.Printf("Getting connection")
-		conn := redisPool.Get()
+		log.Printf("Getting connection to: %v", redisAddr)
+		conn, err := redis.Dial("tcp", redisAddr)
+		if err != nil {
+			errors.Wrap(err, "Error connecting")
+			return nil, err
+		}
 		defer conn.Close()
 		log.Printf("Reading from redis")
 		data, err := redis.String(conn.Do("GET", "token-cache"))
@@ -50,11 +48,11 @@ func (t TokenCacheRedis) SaveToken(token Token) error {
 
 	if t.cfg.TokenCache != nil {
 		redisAddr := t.cfg.TokenCacheStorageRedis
-		redisPool = redis.NewPool(func() (redis.Conn, error) {
-			return redis.Dial("tcp", redisAddr)
-		}, 1)
-
-		conn := redisPool.Get()
+		conn, err := redis.Dial("tcp", redisAddr)
+		if err != nil {
+			errors.Wrap(err, "Error connecting")
+			return err
+		}
 		defer conn.Close()
 		payload, err := json.Marshal(&token)
 		if err != nil {
