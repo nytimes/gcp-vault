@@ -227,10 +227,8 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 			return vClient, nil
 		}
 		log.Print("Token in cache is expired.")
-
 	}
 
-	log.Print("Getting new token from Vault")
 	//renew token since expired or not in cache
 	token, err := getToken(ctx, cfg, vClient)
 	if err != nil {
@@ -399,9 +397,7 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 }
 
 func isExpired(token *Token, cfg Config) bool {
-
 	if token == nil {
-		log.Println("isExpired: nil token")
 		return true
 	}
 
@@ -411,17 +407,12 @@ func isExpired(token *Token, cfg Config) bool {
 	}
 
 	refreshTime := time.Now().Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
-	log.Printf("isExpired: refreshTime =%s", refreshTime)
 	//seed random generator
 	rand.Seed(time.Now().UnixNano())
 	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events
 	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(60))))
-	log.Printf("isExpired: refreshTime with offset =%s", refreshTime)
-	log.Printf("isExpired: token expiration =%s", token.Expires)
 
 	if refreshTime.After(token.Expires) {
-		log.Println("isExpired: expired")
-
 		return true
 	}
 
