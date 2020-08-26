@@ -67,8 +67,9 @@ type Config struct {
 	TokenCacheStorageGCS string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
 	// Host and port for Redis '10.200.30.4:6379'
 	TokenCacheStorageRedis string `envconfig:"TOKEN_CACHE_STORAGE_REDIS"`
-	//How often token should be refreshed (in minutes). Default is 15 min.
-	CachedTokenRefreshThreshold int `envconfig:"VAULT_CACHED_TOKEN_REFRESHED_THRESHOLD"`
+	// How long before the token expiration should be it be regenerated (in minutes).
+	// Default is 5 min.
+	CachedTokenRefreshThreshold int `envconfig:"TOKEN_CACHE_REFRESH_THRESHOLD"`
 
 	TokenCache TokenCache
 }
@@ -213,10 +214,12 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 	}
 
 	if cfg.TokenCache != nil {
+		now := time.Now()
 		token, err := cfg.TokenCache.GetToken(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve Vault token from cache")
 		}
+		log.Printf("Took %v ms to get the token from cache", time.Now().Sub(now).Milliseconds())
 
 		if !isExpired(token, cfg) {
 			vClient.SetToken(token.Token)
@@ -227,8 +230,6 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 
 	}
 
-	//capture start time for token expiration
-	now := time.Now()
 	log.Print("Getting new token from Vault")
 	//renew token since expired or not in cache
 	token, err := getToken(ctx, cfg, vClient)
@@ -243,15 +244,13 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve token ttl")
 		}
-
-		log.Printf("Now is %v", now)
-		log.Printf("Expiration time %s", now.Add(tokenExpiration))
-		log.Printf("Token duration is %v", token.Auth.LeaseDuration)
-
+		now := time.Now()
 		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
 		}
+		log.Printf("Took %v ms to save the token to cache", time.Now().Sub(now).Milliseconds())
+
 	}
 
 	return vClient, nil
