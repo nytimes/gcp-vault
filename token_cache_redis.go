@@ -21,7 +21,7 @@ func (t TokenCacheRedis) GetToken(ctx context.Context) (*Token, error) {
 		log.Printf("Getting connection to: %v", redisAddr)
 		conn, err := redis.Dial("tcp", redisAddr)
 		if err != nil {
-			errors.Wrap(err, "Error connecting")
+			log.Printf("Error connecting %v", err)
 			return nil, err
 		}
 		defer conn.Close()
