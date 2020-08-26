@@ -64,8 +64,9 @@ type Config struct {
 	HTTPClient *http.Client
 
 	// GCS bucket location where token can be stored for caching purposes
-	TokenCacheStorageGCS         string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
-	TokenCacheStorageMemoryStore string `envconfig:"TOKEN_CACHE_STORAGE_MEMORY_STORE"`
+	TokenCacheStorageGCS string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
+	// Host and port for Redis '10.200.30.4:6379'
+	TokenCacheStorageRedis string `envconfig:"TOKEN_CACHE_STORAGE_REDIS"`
 	//How often token should be refreshed (in minutes). Default is 15 min.
 	CachedTokenRefreshThreshold int `envconfig:"VAULT_CACHED_TOKEN_REFRESHED_THRESHOLD"`
 
@@ -83,7 +84,7 @@ type Token struct {
 }
 
 const (
-	CachedTokenRefreshThresholdDefault = 15
+	CachedTokenRefreshThresholdDefault = 5
 )
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -178,9 +179,13 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 	return errors.Wrap(err, "unable to make vault request")
 }
 
-func checkDefaults(cfg *Config) {
+func checkDefaults(cfg *Config) error {
 	if cfg == nil {
-		return
+		return nil
+	}
+
+	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCacheStorageRedis != "" {
+		return errors.New("Both Cache types are configured")
 	}
 
 	if cfg.AuthPath == "" {
@@ -190,6 +195,11 @@ func checkDefaults(cfg *Config) {
 	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCache == nil {
 		cfg.TokenCache = TokenCacheGCS{cfg: cfg}
 	}
+
+	if cfg.TokenCacheStorageRedis != "" && cfg.TokenCache == nil {
+		cfg.TokenCache = TokenCacheRedis{cfg: cfg}
+	}
+	return nil
 }
 
 func login(ctx context.Context, cfg Config) (*api.Client, error) {
@@ -234,9 +244,9 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 			return nil, errors.Wrap(err, "unable to retrieve token ttl")
 		}
 
-		log.Print("Now is %v", now)
+		log.Printf("Now is %v", now)
 		log.Printf("Expiration time %s", now.Add(tokenExpiration))
-		log.Print("Token duration is %v", token.Auth.LeaseDuration)
+		log.Printf("Token duration is %v", token.Auth.LeaseDuration)
 
 		err = cfg.TokenCache.SaveToken(Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
 		if err != nil {
