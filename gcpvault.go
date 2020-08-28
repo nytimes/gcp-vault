@@ -219,7 +219,7 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to retrieve Vault token from cache")
 		}
-		log.Printf("Took %v ms to get the token from cache", time.Now().Sub(now).Milliseconds())
+		log.Printf("Took %v seconds to get the token from cache", time.Since(now).Seconds())
 
 		if !isExpired(token, cfg) {
 			vClient.SetToken(token.Token)
@@ -247,7 +247,7 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to save token to cache")
 		}
-		log.Printf("Took %v ms to save the token to cache", time.Now().Sub(now).Milliseconds())
+		log.Printf("Took %v seconds to save the token to cache", time.Since(now).Seconds())
 
 	}
 
