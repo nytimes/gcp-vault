@@ -3,6 +3,12 @@ package gcpvault
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
@@ -11,11 +17,6 @@ import (
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 func TestGetSecrets(t *testing.T) {
@@ -625,6 +626,6 @@ func (t TokenCacheMock) GetToken(ctx context.Context) (*Token, error) {
 	return &t.Token, nil
 }
 
-func (t TokenCacheMock) SaveToken(token Token) error {
+func (t TokenCacheMock) SaveToken(ctx context.Context, token Token) error {
 	return nil
 }

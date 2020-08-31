@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"time"
 
 	"cloud.google.com/go/storage"
 )
@@ -18,15 +17,12 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
 
 	if t.cfg.TokenCache != nil {
 		bucket := t.cfg.TokenCacheStorageGCS
-		object := "token-cache"
+		object := t.cfg.TokenCacheKeyName
 		client, err := storage.NewClient(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("storage.NewClient: %v", err)
 		}
 		defer client.Close()
-
-		ctx, cancel := context.WithTimeout(ctx, time.Second*50)
-		defer cancel()
 
 		rc, err := client.Bucket(bucket).Object(object).NewReader(ctx)
 		if err != nil {
@@ -51,22 +47,18 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
 
 }
 
-func (t TokenCacheGCS) SaveToken(token Token) error {
+func (t TokenCacheGCS) SaveToken(ctx context.Context, token Token) error {
 
 	if t.cfg.TokenCache != nil {
 
 		bucket := t.cfg.TokenCacheStorageGCS
-		object := "token-cache"
+		object := t.cfg.TokenCacheKeyName
 
-		ctx := context.Background()
 		client, err := storage.NewClient(ctx)
 		if err != nil {
 			return fmt.Errorf("storage.NewClient: %v", err)
 		}
 		defer client.Close()
-
-		ctx, cancel := context.WithTimeout(ctx, time.Second*50)
-		defer cancel()
 
 		// Upload an object with storage.Writer.
 		wc := client.Bucket(bucket).Object(object).NewWriter(ctx)
