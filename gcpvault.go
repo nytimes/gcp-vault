@@ -237,6 +237,7 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 	timeout := time.Duration(cfg.TokenCacheCtxTimeout)
 	ctx, cancel := context.WithTimeout(ctx, time.Second*timeout)
 	defer cancel()
+
 	b := backoff.NewExponentialBackOff()
 
 	var token Token
@@ -244,7 +245,14 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		token, err = getVaultTokenFromCache(ctx, cfg, b)
 	}
 
-	if err != nil || token.Token == "" {
+	//an error with gcs or redis
+	if err != nil {
+		return nil, err
+	}
+
+	//token is missing from cache or expired
+	if token.Token == "" {
+		//generate new token from Vault
 		token, err := getToken(ctx, cfg, vClient)
 		if err != nil {
 			return nil, err
@@ -256,8 +264,9 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		return nil, err
+		return vClient, nil
 	}
+
 	vClient.SetToken(token.Token)
 	return vClient, nil
 }
@@ -283,7 +292,7 @@ func getVaultTokenFromCache(ctx context.Context, cfg Config, b *backoff.Exponent
 		return *token, nil
 	}
 	log.Print("Token in cache is expired.")
-	return *token, errors.Wrap(err, "Token in cache has expired")
+	return Token{}, nil
 }
 
 func persistVaultTokenToCache(ctx context.Context, cfg Config, token *api.Secret, b *backoff.ExponentialBackOff) error {
