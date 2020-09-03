@@ -3,11 +3,9 @@ package gcpvault
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"time"
-
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
+	"time"
 )
 
 type TokenCacheRedis struct {
@@ -20,24 +18,21 @@ func (t TokenCacheRedis) GetToken(ctx context.Context) (*Token, error) {
 
 		redisAddr := t.cfg.TokenCacheStorageRedis
 		tokenKey := t.cfg.TokenCacheKeyName
-		log.Printf("Getting connection to: %v", redisAddr)
+
 		conn, err := redis.Dial("tcp", redisAddr, redis.DialConnectTimeout(time.Second*time.Duration(t.cfg.TokenCacheCtxTimeout)))
 		if err != nil {
-			log.Printf("Error connecting %v", err)
-			return nil, err
+			return nil, errors.Wrap(err, "error connecting")
 		}
 		defer conn.Close()
-		log.Printf("Reading from redis")
+
 		data, err := redis.String(conn.Do("GET", tokenKey))
 		if err != nil {
-			errors.Wrap(err, "Error calling redis GET")
-			return nil, nil
+			return nil, err
 		}
 		var token Token
 		err = json.Unmarshal([]byte(data), &token)
 		if err != nil {
-			errors.Wrap(err, "Error Unmarshaling data")
-			return nil, err
+			return nil, errors.Wrap(err, "error unmarshalling data")
 		}
 		return &token, nil
 	}
@@ -49,12 +44,13 @@ func (t TokenCacheRedis) GetToken(ctx context.Context) (*Token, error) {
 func (t TokenCacheRedis) SaveToken(ctx context.Context, token Token) error {
 
 	if t.cfg.TokenCache != nil {
+
 		redisAddr := t.cfg.TokenCacheStorageRedis
 		tokenKey := t.cfg.TokenCacheKeyName
 		conn, err := redis.Dial("tcp", redisAddr, redis.DialConnectTimeout(time.Second*time.Duration(t.cfg.TokenCacheCtxTimeout)))
+
 		if err != nil {
-			errors.Wrap(err, "Error connecting")
-			return err
+			return errors.Wrap(err, "Error connecting")
 		}
 		defer conn.Close()
 		payload, err := json.Marshal(&token)
@@ -67,5 +63,6 @@ func (t TokenCacheRedis) SaveToken(ctx context.Context, token Token) error {
 		}
 		return nil
 	}
+
 	return nil
 }

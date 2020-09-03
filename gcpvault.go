@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -280,18 +279,15 @@ func getVaultTokenFromCache(ctx context.Context, cfg Config, b *backoff.Exponent
 		token, err = cfg.TokenCache.GetToken(ctx)
 		return err
 	}, backoff.WithMaxRetries(b, uint64(cfg.MaxRetries)))
-	now := time.Now()
 
 	if err != nil {
 		return *token, errors.Wrapf(err, "unable to retrieve Vault token from cache after %d retries", cfg.MaxRetries)
 	}
-	log.Printf("Took %v s to get the token from cache", time.Since(now).Seconds())
 
 	if !isExpired(token, cfg) {
-		log.Print("Retrieved token from cache.")
 		return *token, nil
 	}
-	log.Print("Token in cache is expired.")
+	//token is expired
 	return Token{}, nil
 }
 
@@ -311,7 +307,7 @@ func persistVaultTokenToCache(ctx context.Context, cfg Config, token *api.Secret
 		if err != nil {
 			return errors.Wrapf(err, "unable to save Vault token to cache after %d retries", cfg.MaxRetries)
 		}
-		log.Printf("Took %v seconds to save the token to cache", time.Since(now).Seconds())
+
 	}
 	return nil
 }
