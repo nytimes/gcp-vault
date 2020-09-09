@@ -66,6 +66,8 @@ type Config struct {
 	// How long before the token expiration should be it be regenerated (in minutes).
 	// Default is 5 min.
 	CachedTokenRefreshThreshold int `envconfig:"TOKEN_CACHE_REFRESH_THRESHOLD"`
+	//Random refresh offset in seconds to avoid all the instances refreshing at once. Default is 1/2 the duration in seconds of the TOKEN_CACHE_REFRESH_THRESHOLD.
+	TokenCacheRefreshRandomOffset int `envconfig:"TOKEN_CACHE_REFRESH_RANDOM_OFFSET"`
 	// this value is in seconds. Default value is 30 seconds
 	TokenCacheCtxTimeout int `envconfig:"TOKEN_CACHE_CTX_TIMEOUT"`
 	// the object name to store. Default value is 'token-cache'
@@ -87,9 +89,10 @@ type Token struct {
 }
 
 const (
-	CachedTokenRefreshThresholdDefault = 5
-	TokenCacheCtxTimeoutDefault        = 30
-	TokenCacheKeyNameDefault           = "token-cache"
+	CachedTokenRefreshThresholdDefault   = 5
+	TokenCacheCtxTimeoutDefault          = 30
+	TokenCacheRefreshRandomOffsetDefault = 60
+	TokenCacheKeyNameDefault             = "token-cache"
 )
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -218,6 +221,18 @@ func checkDefaults(cfg *Config) error {
 	//if the token cache name is not set, use default
 	if cfg.TokenCacheKeyName == "" {
 		cfg.TokenCacheKeyName = TokenCacheKeyNameDefault
+	}
+
+	if cfg.TokenCacheRefreshRandomOffset == 0 && cfg.CachedTokenRefreshThreshold > 0 {
+		//TOKEN_CACHE_REFRESH_RANDOM_OFFSET is not set, TOKEN_CACHE_REFRESH_THRESHOLD is set
+		refreshDuration := time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold)
+		// setting random offset to 1/2 the refresh threshold
+		seconds := int(refreshDuration/time.Second) / 2
+
+		cfg.TokenCacheRefreshRandomOffset = seconds
+	} else if cfg.TokenCacheRefreshRandomOffset == 0 {
+		// TOKEN_CACHE_REFRESH_RANDOM_OFFSET is not set
+		cfg.TokenCacheRefreshRandomOffset = TokenCacheRefreshRandomOffsetDefault
 	}
 
 	return nil
@@ -463,7 +478,7 @@ func isExpired(token *Token, cfg Config) bool {
 	//seed random generator
 	rand.Seed(time.Now().UnixNano())
 	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events
-	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(60))))
+	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(cfg.TokenCacheRefreshRandomOffset))))
 
 	if refreshTime.After(token.Expires) {
 		return true
