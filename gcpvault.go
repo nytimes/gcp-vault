@@ -63,9 +63,9 @@ type Config struct {
 	HTTPClient *http.Client
 
 	TokenCache TokenCache
-	// How long before the token expiration should be it be regenerated (in minutes).
-	// Default is 5 min.
-	CachedTokenRefreshThreshold int `envconfig:"TOKEN_CACHE_REFRESH_THRESHOLD"`
+	// How long before the token expiration should it be regenerated (in seconds).
+	// Default is 300 seconds.
+	TokenCacheRefreshThreshold int `envconfig:"TOKEN_CACHE_REFRESH_THRESHOLD"`
 	//Random refresh offset in seconds to avoid all the instances refreshing at once. Default is 1/2 the duration in seconds of the TOKEN_CACHE_REFRESH_THRESHOLD.
 	TokenCacheRefreshRandomOffset int `envconfig:"TOKEN_CACHE_REFRESH_RANDOM_OFFSET"`
 	// this value is in seconds. Default value is 30 seconds
@@ -89,7 +89,7 @@ type Token struct {
 }
 
 const (
-	CachedTokenRefreshThresholdDefault   = 5
+	CachedTokenRefreshThresholdDefault   = 300
 	TokenCacheCtxTimeoutDefault          = 30
 	TokenCacheRefreshRandomOffsetDefault = 60
 	TokenCacheKeyNameDefault             = "token-cache"
@@ -117,7 +117,10 @@ const (
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
 func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	vClient, err := login(ctx, cfg)
 	if err != nil {
@@ -142,7 +145,11 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 // PutSecrets writes secrets to Vault at the configured path.
 // This is comparable to the `vault write` command.
 func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return err
+	}
+
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
@@ -154,7 +161,11 @@ func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{})
 // GetVersionedSecrets reads versioned secrets from Vault.
 // This is comparable to the `vault kv get` command.
 func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	secs, err := GetSecrets(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -170,7 +181,11 @@ func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
 // This is comparable to the `vault kv put` command.
 func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return err
+	}
+
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
@@ -189,7 +204,7 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 
 func checkDefaults(cfg *Config) error {
 	if cfg == nil {
-		return nil
+		return errors.New("configuration is empty")
 	}
 
 	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCacheStorageRedis != "" {
@@ -209,8 +224,8 @@ func checkDefaults(cfg *Config) error {
 	}
 
 	//if expiration is not set, use default
-	if cfg.CachedTokenRefreshThreshold == 0 {
-		cfg.CachedTokenRefreshThreshold = CachedTokenRefreshThresholdDefault
+	if cfg.TokenCacheRefreshThreshold == 0 {
+		cfg.TokenCacheRefreshThreshold = CachedTokenRefreshThresholdDefault
 	}
 
 	//if token cache timeout is not set, use default
@@ -223,11 +238,9 @@ func checkDefaults(cfg *Config) error {
 		cfg.TokenCacheKeyName = TokenCacheKeyNameDefault
 	}
 
-	if cfg.TokenCacheRefreshRandomOffset == 0 && cfg.CachedTokenRefreshThreshold > 0 {
-		//TOKEN_CACHE_REFRESH_RANDOM_OFFSET is not set, TOKEN_CACHE_REFRESH_THRESHOLD is set
-		refreshDuration := time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold)
-		// setting random offset to 1/2 the refresh threshold
-		seconds := int(refreshDuration/time.Second) / 2
+	if cfg.TokenCacheRefreshRandomOffset == 0 && cfg.TokenCacheRefreshThreshold > 0 {
+		// setting random offset to 1/2 of the refresh threshold
+		seconds := cfg.TokenCacheRefreshThreshold / 2
 
 		cfg.TokenCacheRefreshRandomOffset = seconds
 	} else if cfg.TokenCacheRefreshRandomOffset == 0 {
@@ -474,7 +487,7 @@ func isExpired(token *Token, cfg Config) bool {
 		return true
 	}
 
-	refreshTime := time.Now().Add(time.Minute * time.Duration(cfg.CachedTokenRefreshThreshold))
+	refreshTime := time.Now().Add(time.Second * time.Duration(cfg.TokenCacheRefreshThreshold))
 	//seed random generator
 	rand.Seed(time.Now().UnixNano())
 	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events

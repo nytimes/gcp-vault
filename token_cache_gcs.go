@@ -20,7 +20,7 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
 		object := t.cfg.TokenCacheKeyName
 		client, err := storage.NewClient(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("storage.NewClient: %v", err)
+			return nil, fmt.Errorf("error creating new storage client: %v", err)
 		}
 		defer client.Close()
 
@@ -33,7 +33,7 @@ func (t TokenCacheGCS) GetToken(ctx context.Context) (*Token, error) {
 
 		data, err := ioutil.ReadAll(rc)
 		if err != nil {
-			return nil, fmt.Errorf("ioutil.ReadAll: %v", err)
+			return nil, fmt.Errorf("error reading: %v", err)
 		}
 		var token Token
 		err = json.Unmarshal(data, &token)
@@ -56,7 +56,7 @@ func (t TokenCacheGCS) SaveToken(ctx context.Context, token Token) error {
 
 		client, err := storage.NewClient(ctx)
 		if err != nil {
-			return fmt.Errorf("storage.NewClient: %v", err)
+			return fmt.Errorf("error creating new storage client: %v", err)
 		}
 		defer client.Close()
 
@@ -65,13 +65,13 @@ func (t TokenCacheGCS) SaveToken(ctx context.Context, token Token) error {
 		wc.ContentType = "application/json"
 		payload, err := json.Marshal(&token)
 		if err != nil {
-			return fmt.Errorf("json.Marshal: %v", err)
+			return fmt.Errorf("error mashaling: %v", err)
 		}
 		if _, err := wc.Write(payload); err != nil {
-			return fmt.Errorf("wc.Write: %v", err)
+			return fmt.Errorf("error writing: %v", err)
 		}
 		if err := wc.Close(); err != nil {
-			return fmt.Errorf("Writer.Close: %v", err)
+			return fmt.Errorf("error closing: %v", err)
 		}
 		return nil
 	}
