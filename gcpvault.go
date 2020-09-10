@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -60,7 +61,39 @@ type Config struct {
 	// HTTP requests made by this library. If not set, an http.Client with a 1s
 	// IdleConnTimeout will be used.
 	HTTPClient *http.Client
+
+	TokenCache TokenCache
+	// How long before the token expiration should it be regenerated (in seconds).
+	// Default is 300 seconds.
+	TokenCacheRefreshThreshold int `envconfig:"TOKEN_CACHE_REFRESH_THRESHOLD"`
+	//Random refresh offset in seconds to avoid all the instances refreshing at once. Default is 1/2 the duration in seconds of the TOKEN_CACHE_REFRESH_THRESHOLD.
+	TokenCacheRefreshRandomOffset int `envconfig:"TOKEN_CACHE_REFRESH_RANDOM_OFFSET"`
+	// this value is in seconds. Default value is 30 seconds
+	TokenCacheCtxTimeout int `envconfig:"TOKEN_CACHE_CTX_TIMEOUT"`
+	// the object name to store. Default value is 'token-cache'
+	TokenCacheKeyName string `envconfig:"TOKEN_CACHE_KEY_NAME"`
+	// GCS bucket location where token can be stored for caching purposes
+	TokenCacheStorageGCS string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
+	// Host and port for Redis '10.200.30.4:6379'
+	TokenCacheStorageRedis string `envconfig:"TOKEN_CACHE_STORAGE_REDIS"`
 }
+
+type TokenCache interface {
+	GetToken(ctx context.Context) (*Token, error)
+	SaveToken(ctx context.Context, token Token) error
+}
+
+type Token struct {
+	Token   string
+	Expires time.Time
+}
+
+const (
+	CachedTokenRefreshThresholdDefault   = 300
+	TokenCacheCtxTimeoutDefault          = 30
+	TokenCacheRefreshRandomOffsetDefault = 60
+	TokenCacheKeyNameDefault             = "token-cache"
+)
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
 // Vault.
@@ -84,7 +117,10 @@ type Config struct {
 // If running in a local development environment (via 'goapp test' or dev_appserver.py)
 // this tool will expect the LocalToken to be set in some way.
 func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	vClient, err := login(ctx, cfg)
 	if err != nil {
@@ -109,7 +145,11 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 // PutSecrets writes secrets to Vault at the configured path.
 // This is comparable to the `vault write` command.
 func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return err
+	}
+
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
@@ -121,7 +161,11 @@ func PutSecrets(ctx context.Context, cfg Config, secrets map[string]interface{})
 // GetVersionedSecrets reads versioned secrets from Vault.
 // This is comparable to the `vault kv get` command.
 func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error) {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	secs, err := GetSecrets(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -137,7 +181,11 @@ func GetVersionedSecrets(ctx context.Context, cfg Config) (map[string]interface{
 // PutVersionedSecrets writes versioned secrets to Vault at the configured path.
 // This is comparable to the `vault kv put` command.
 func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]interface{}) error {
-	checkDefaults(&cfg)
+	err := checkDefaults(&cfg)
+	if err != nil {
+		return err
+	}
+
 	vClient, err := login(ctx, cfg)
 	if err != nil {
 		return errors.Wrap(err, "unable to login to vault")
@@ -154,14 +202,53 @@ func PutVersionedSecrets(ctx context.Context, cfg Config, secrets map[string]int
 	return errors.Wrap(err, "unable to make vault request")
 }
 
-func checkDefaults(cfg *Config) {
+func checkDefaults(cfg *Config) error {
 	if cfg == nil {
-		return
+		return errors.New("configuration is empty")
+	}
+
+	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCacheStorageRedis != "" {
+		return errors.New("Both Cache types are configured")
 	}
 
 	if cfg.AuthPath == "" {
 		cfg.AuthPath = "auth/gcp"
 	}
+
+	if cfg.TokenCacheStorageGCS != "" && cfg.TokenCache == nil {
+		cfg.TokenCache = TokenCacheGCS{cfg: cfg}
+	}
+
+	if cfg.TokenCacheStorageRedis != "" && cfg.TokenCache == nil {
+		cfg.TokenCache = TokenCacheRedis{cfg: cfg}
+	}
+
+	//if expiration is not set, use default
+	if cfg.TokenCacheRefreshThreshold == 0 {
+		cfg.TokenCacheRefreshThreshold = CachedTokenRefreshThresholdDefault
+	}
+
+	//if token cache timeout is not set, use default
+	if cfg.TokenCacheCtxTimeout == 0 {
+		cfg.TokenCacheCtxTimeout = TokenCacheCtxTimeoutDefault
+	}
+
+	//if the token cache name is not set, use default
+	if cfg.TokenCacheKeyName == "" {
+		cfg.TokenCacheKeyName = TokenCacheKeyNameDefault
+	}
+
+	if cfg.TokenCacheRefreshRandomOffset == 0 && cfg.TokenCacheRefreshThreshold > 0 {
+		// setting random offset to 1/2 of the refresh threshold
+		seconds := cfg.TokenCacheRefreshThreshold / 2
+
+		cfg.TokenCacheRefreshRandomOffset = seconds
+	} else if cfg.TokenCacheRefreshRandomOffset == 0 {
+		// TOKEN_CACHE_REFRESH_RANDOM_OFFSET is not set
+		cfg.TokenCacheRefreshRandomOffset = TokenCacheRefreshRandomOffsetDefault
+	}
+
+	return nil
 }
 
 func login(ctx context.Context, cfg Config) (*api.Client, error) {
@@ -173,6 +260,87 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to init vault client")
 	}
+
+	timeout := time.Duration(cfg.TokenCacheCtxTimeout)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*timeout)
+	defer cancel()
+
+	b := backoff.NewExponentialBackOff()
+
+	var token Token
+	if cfg.TokenCache != nil {
+		token, err = getVaultTokenFromCache(ctx, cfg, b)
+	}
+
+	//an error with gcs or redis
+	if err != nil {
+		return nil, err
+	}
+
+	//token is missing from cache or expired
+	if token.Token == "" {
+		//generate new token from Vault
+		token, err := getToken(ctx, cfg, vClient)
+		if err != nil {
+			return nil, err
+		}
+
+		vClient.SetToken(token.Auth.ClientToken)
+		//save to cache
+		err = persistVaultTokenToCache(ctx, cfg, token, b)
+		if err != nil {
+			return nil, err
+		}
+		return vClient, nil
+	}
+
+	vClient.SetToken(token.Token)
+	return vClient, nil
+}
+
+func getVaultTokenFromCache(ctx context.Context, cfg Config, b *backoff.ExponentialBackOff) (Token, error) {
+	var (
+		token *Token
+		err   error
+	)
+	err = backoff.Retry(func() error {
+		token, err = cfg.TokenCache.GetToken(ctx)
+		return err
+	}, backoff.WithMaxRetries(b, uint64(cfg.MaxRetries)))
+
+	if err != nil {
+		return *token, errors.Wrapf(err, "unable to retrieve Vault token from cache after %d retries", cfg.MaxRetries)
+	}
+
+	if !isExpired(token, cfg) {
+		return *token, nil
+	}
+	//token is expired
+	return Token{}, nil
+}
+
+func persistVaultTokenToCache(ctx context.Context, cfg Config, token *api.Secret, b *backoff.ExponentialBackOff) error {
+	if cfg.TokenCache != nil {
+		tokenExpiration, err := token.TokenTTL()
+		if err != nil {
+			return errors.Wrap(err, "unable to retrieve token ttl")
+		}
+
+		now := time.Now()
+		err = backoff.Retry(func() error {
+			err = cfg.TokenCache.SaveToken(ctx, Token{Token: token.Auth.ClientToken, Expires: now.Add(tokenExpiration)})
+			return err
+		}, backoff.WithMaxRetries(b, uint64(cfg.MaxRetries)))
+
+		if err != nil {
+			return errors.Wrapf(err, "unable to save Vault token to cache after %d retries", cfg.MaxRetries)
+		}
+
+	}
+	return nil
+}
+
+func getToken(ctx context.Context, cfg Config, vClient *api.Client) (*api.Secret, error) {
 
 	// create signed JWT with our service account
 	jwt, err := newJWT(ctx, cfg)
@@ -188,9 +356,7 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 		return nil, errors.Wrap(err, "unable to make login request")
 	}
 
-	vClient.SetToken(resp.Auth.ClientToken)
-
-	return vClient, nil
+	return resp, nil
 }
 
 func newClient(ctx context.Context, cfg Config) (*api.Client, error) {
@@ -314,4 +480,22 @@ func getEmailFromCredentials(creds *google.Credentials) (string, error) {
 	}
 
 	return data["client_email"], nil
+}
+
+func isExpired(token *Token, cfg Config) bool {
+	if token == nil {
+		return true
+	}
+
+	refreshTime := time.Now().Add(time.Second * time.Duration(cfg.TokenCacheRefreshThreshold))
+	//seed random generator
+	rand.Seed(time.Now().UnixNano())
+	//subtract random number of seconds from the expiration to avoid many simultaneous refresh events
+	refreshTime = refreshTime.Add(time.Second * (-1 * time.Duration(rand.Intn(cfg.TokenCacheRefreshRandomOffset))))
+
+	if refreshTime.After(token.Expires) {
+		return true
+	}
+
+	return false
 }

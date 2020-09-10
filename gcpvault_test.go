@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/hashicorp/vault/api"
@@ -187,7 +188,7 @@ func TestGetSecrets(t *testing.T) {
 			givenIAMErr: true,
 
 			wantErr: true,
-		},{
+		}, {
 			name: "GCP standard login, success after retry once",
 
 			givenEmail: "jp@example.com",
@@ -217,6 +218,95 @@ func TestGetSecrets(t *testing.T) {
 				"my-other-sec": "abcd",
 			},
 			wantIAMRetry: true,
+		},
+		{
+			name:       "GCP login, token in cache is valid",
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:                 "my-gcp-role",
+				SecretPath:           "my-secret-path",
+				TokenCacheStorageGCS: "bluh",
+				TokenCache:           TokenCacheMock{Token{Token: "AAA", Expires: time.Now().AddDate(0, 0, 1)}},
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:  true,
+			wantVaultLogin: false,
+			wantMetaHit:    false,
+			wantIAMHit:     false,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+		},
+		{
+			name:       "GCP login, cache is not set",
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:                 "my-gcp-role",
+				SecretPath:           "my-secret-path",
+				TokenCacheStorageGCS: "bluh",
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:  true,
+			wantVaultLogin: true,
+			wantMetaHit:    true,
+			wantIAMHit:     true,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+		},
+		{
+			name:       "GCP login, token in cache is expired",
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:                 "my-gcp-role",
+				SecretPath:           "my-secret-path",
+				TokenCacheStorageGCS: "bluh",
+				TokenCache:           TokenCacheMock{Token{Token: "AAA", Expires: time.Now().AddDate(0, 0, -1)}},
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:  true,
+			wantVaultLogin: true,
+			wantMetaHit:    true,
+			wantIAMHit:     true,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
 		},
 	}
 
@@ -297,6 +387,7 @@ func TestGetSecrets(t *testing.T) {
 			cfg.IAMAddress = iamSvr.URL
 			cfg.MetadataAddress = metaSvr.URL
 			cfg.VaultAddress = vaultSvr.URL
+			cfg.TokenCache = test.givenCfg.TokenCache
 
 			if appengine.IsDevAppServer() && !test.givenGAE {
 				t.Log("in an app engine environment, skipping non GAE test")
@@ -525,4 +616,16 @@ type testTokenSource struct{}
 
 func (t testTokenSource) Token() (*oauth2.Token, error) {
 	return &oauth2.Token{}, nil
+}
+
+type TokenCacheMock struct {
+	Token Token
+}
+
+func (t TokenCacheMock) GetToken(ctx context.Context) (*Token, error) {
+	return &t.Token, nil
+}
+
+func (t TokenCacheMock) SaveToken(ctx context.Context, token Token) error {
+	return nil
 }

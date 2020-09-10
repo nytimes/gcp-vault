@@ -11,6 +11,6 @@ require (
 	github.com/go-kit/kit v0.8.0
 	github.com/kelseyhightower/envconfig v1.3.0
 	github.com/pkg/errors v0.8.1
-	google.golang.org/appengine v1.4.0
-	google.golang.org/grpc v1.18.0
+	google.golang.org/appengine v1.6.6
+	google.golang.org/grpc v1.31.0
 )
