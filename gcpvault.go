@@ -93,6 +93,7 @@ const (
 	TokenCacheCtxTimeoutDefault          = 30
 	TokenCacheRefreshRandomOffsetDefault = 60
 	TokenCacheKeyNameDefault             = "token-cache"
+	TokenCacheMaxRetriesDefault          = 3
 )
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -238,6 +239,11 @@ func checkDefaults(cfg *Config) error {
 		cfg.TokenCacheKeyName = TokenCacheKeyNameDefault
 	}
 
+	//if max retries is not set, use default
+	if cfg.MaxRetries == 0 {
+		cfg.MaxRetries = TokenCacheMaxRetriesDefault
+	}
+
 	if cfg.TokenCacheRefreshRandomOffset == 0 && cfg.TokenCacheRefreshThreshold > 0 {
 		// setting random offset to 1/2 of the refresh threshold
 		seconds := cfg.TokenCacheRefreshThreshold / 2
@@ -309,7 +315,7 @@ func getVaultTokenFromCache(ctx context.Context, cfg Config, b *backoff.Exponent
 	}, backoff.WithMaxRetries(b, uint64(cfg.MaxRetries)))
 
 	if err != nil {
-		return *token, errors.Wrapf(err, "unable to retrieve Vault token from cache after %d retries", cfg.MaxRetries)
+		return Token{}, errors.Wrapf(err, "unable to retrieve Vault token from cache after %d retries", cfg.MaxRetries)
 	}
 
 	if !isExpired(token, cfg) {

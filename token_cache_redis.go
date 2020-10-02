@@ -27,7 +27,8 @@ func (t TokenCacheRedis) GetToken(ctx context.Context) (*Token, error) {
 
 		data, err := redis.String(conn.Do("GET", tokenKey))
 		if err != nil {
-			return nil, err
+			// swallowing the error here since we may not have cached a token yet
+			return nil, nil
 		}
 		var token Token
 		err = json.Unmarshal([]byte(data), &token)
