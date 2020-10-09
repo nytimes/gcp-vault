@@ -271,7 +271,6 @@ func login(ctx context.Context, cfg Config) (*api.Client, error) {
 	if cfg.TokenCache != nil {
 		token, err = getVaultTokenFromCache(ctx, cfg, b)
 	}
-
 	//an error with gcs or redis
 	if err != nil {
 		return nil, err
@@ -312,7 +311,7 @@ func getVaultTokenFromCache(ctx context.Context, cfg Config, b *backoff.Exponent
 		return *token, errors.Wrapf(err, "unable to retrieve Vault token from cache after %d retries", cfg.MaxRetries)
 	}
 
-	if !isExpired(token, cfg) {
+	if !(isExpired(token, cfg) || isRevoked(ctx, cfg, token)) {
 		return *token, nil
 	}
 	//token is expired
@@ -497,5 +496,18 @@ func isExpired(token *Token, cfg Config) bool {
 		return true
 	}
 
+	return false
+}
+
+func isRevoked(ctx context.Context, cfg Config, token *Token) bool {
+	vClient, err := newClient(ctx, cfg)
+	if err != nil {
+		return true
+	}
+	vClient.SetToken(token.Token)
+	_, err = vClient.Auth().Token().LookupSelf()
+	if err != nil {
+		return true
+	}
 	return false
 }

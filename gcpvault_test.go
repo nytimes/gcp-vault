@@ -31,13 +31,14 @@ func TestGetSecrets(t *testing.T) {
 		givenGAE      bool
 		givenCreds    *google.Credentials
 
-		wantVaultLogin bool
-		wantVaultRead  bool
-		wantIAMHit     bool
-		wantMetaHit    bool
-		wantErr        bool
-		wantIAMRetry   bool
-		wantSecrets    map[string]interface{}
+		wantVaultLogin      bool
+		wantVaultRead       bool
+		wantVaultLookupSelf bool
+		wantIAMHit          bool
+		wantMetaHit         bool
+		wantErr             bool
+		wantIAMRetry        bool
+		wantSecrets         map[string]interface{}
 	}{
 		{
 			name: "local token, success",
@@ -74,8 +75,8 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-	  "client_secret": "abcd",  "refresh_token": "blah",
-  "client_email": "",  "type": "service_account"}`),
+		  "client_secret": "abcd",  "refresh_token": "blah",
+		"client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:  true,
@@ -188,7 +189,8 @@ func TestGetSecrets(t *testing.T) {
 			givenIAMErr: true,
 
 			wantErr: true,
-		}, {
+		},
+		{
 			name: "GCP standard login, success after retry once",
 
 			givenEmail: "jp@example.com",
@@ -205,8 +207,8 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-	  "client_secret": "abcd",  "refresh_token": "blah",
-  "client_email": "",  "type": "service_account"}`),
+		  "client_secret": "abcd",  "refresh_token": "blah",
+		"client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:  true,
@@ -236,14 +238,15 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-	  "client_secret": "abcd",  "refresh_token": "blah",
-  "client_email": "",  "type": "service_account"}`),
+		  "client_secret": "abcd",  "refresh_token": "blah",
+		"client_email": "",  "type": "service_account"}`),
 			},
 
-			wantVaultRead:  true,
-			wantVaultLogin: false,
-			wantMetaHit:    false,
-			wantIAMHit:     false,
+			wantVaultRead:       true,
+			wantVaultLookupSelf: true,
+			wantVaultLogin:      false,
+			wantMetaHit:         false,
+			wantIAMHit:          false,
 			wantSecrets: map[string]interface{}{
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
@@ -265,14 +268,15 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-	  "client_secret": "abcd",  "refresh_token": "blah",
-  "client_email": "",  "type": "service_account"}`),
+		  "client_secret": "abcd",  "refresh_token": "blah",
+		"client_email": "",  "type": "service_account"}`),
 			},
 
-			wantVaultRead:  true,
-			wantVaultLogin: true,
-			wantMetaHit:    true,
-			wantIAMHit:     true,
+			wantVaultRead:       true,
+			wantVaultLookupSelf: false,
+			wantVaultLogin:      true,
+			wantMetaHit:         true,
+			wantIAMHit:          true,
 			wantSecrets: map[string]interface{}{
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
@@ -299,25 +303,60 @@ func TestGetSecrets(t *testing.T) {
   "client_email": "",  "type": "service_account"}`),
 			},
 
-			wantVaultRead:  true,
-			wantVaultLogin: true,
-			wantMetaHit:    true,
-			wantIAMHit:     true,
+			wantVaultRead:       true,
+			wantVaultLookupSelf: true,
+			wantVaultLogin:      true,
+			wantMetaHit:         true,
+			wantIAMHit:          true,
 			wantSecrets: map[string]interface{}{
 				"my-sec":       "123",
 				"my-other-sec": "abcd",
 			},
+		},
+		{
+			name:       "GCP login, token in cache is revoked",
+			givenEmail: "jp@example.com",
+			givenCfg: Config{
+				Role:                 "my-gcp-role",
+				SecretPath:           "my-secret-path",
+				TokenCacheStorageGCS: "bluh",
+				TokenCache:           TokenCacheMock{Token{Token: "AAA", Expires: time.Now().AddDate(0, 0, 1)}},
+			},
+			givenSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenCreds: &google.Credentials{
+				ProjectID:   "test-project",
+				TokenSource: testTokenSource{},
+				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
+	  "client_secret": "abcd",  "refresh_token": "blah",
+  "client_email": "",  "type": "service_account"}`),
+			},
+
+			wantVaultRead:       true,
+			wantVaultLookupSelf: true,
+			wantVaultLogin:      true,
+			wantMetaHit:         true,
+			wantIAMHit:          true,
+			wantSecrets: map[string]interface{}{
+				"my-sec":       "123",
+				"my-other-sec": "abcd",
+			},
+			givenVaultErr: true,
+			wantErr:       true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				cfg           Config
-				gotVaultLogin bool
-				gotVaultRead  bool
-				gotIAMHit     bool
-				gotMetaHit    bool
+				cfg                Config
+				gotVaultLogin      bool
+				gotVaultLookupSelf bool
+				gotVaultRead       bool
+				gotIAMHit          bool
+				gotMetaHit         bool
 			)
 			// ensure defaults are set
 			envconfig.Process("", &cfg)
@@ -325,6 +364,9 @@ func TestGetSecrets(t *testing.T) {
 			vaultSvr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.Method {
 				case http.MethodGet:
+					if test.wantVaultLookupSelf {
+						gotVaultLookupSelf = true
+					}
 					gotVaultRead = true
 					json.NewEncoder(w).Encode(api.Secret{
 						Data: test.givenSecrets,
@@ -429,6 +471,9 @@ func TestGetSecrets(t *testing.T) {
 			}
 			if test.wantVaultRead != gotVaultRead {
 				t.Errorf("expected Vault read? %t - got %t", test.wantVaultRead, gotVaultRead)
+			}
+			if test.wantVaultLookupSelf != gotVaultLookupSelf {
+				t.Errorf("expected Vault lookup self? %t - got %t", test.wantVaultLookupSelf, gotVaultLookupSelf)
 			}
 			if test.wantVaultLogin != gotVaultLogin {
 				t.Errorf("expected Vault login? %t - got %t", test.wantVaultLogin, gotVaultLogin)
