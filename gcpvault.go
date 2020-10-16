@@ -76,6 +76,8 @@ type Config struct {
 	TokenCacheStorageGCS string `envconfig:"TOKEN_CACHE_STORAGE_GCS"`
 	// Host and port for Redis '10.200.30.4:6379'
 	TokenCacheStorageRedis string `envconfig:"TOKEN_CACHE_STORAGE_REDIS"`
+	//Database for Redis. Default is 0
+	TokenCacheStorageRedisDB int `envconfig:"TOKEN_CACHE_STORAGE_REDIS_DB"`
 }
 
 type TokenCache interface {

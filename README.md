@@ -21,3 +21,25 @@ For mocking out the services required for interacting with Vault, a [gcpvaulttes
 ## Examples
 
 Check out the [examples](https://github.com/NYTimes/gcp-vault/tree/master/examples/) directory for examples on how to use this package.
+
+#Vault Token Caching
+
+The library has an option to enable Vault Token Caching. Currently, Redis or GCS is supported for token storage. To enable token caching,
+one the following environment variables should set:
+
+**TOKEN_CACHE_STORAGE_REDIS** - Host and port for Redis '10.200.30.4:6379'
+
+**TOKEN_CACHE_STORAGE_GCS**  - GCS bucket location where token can be stored for caching purposes. Care should be taken to make sure bucket permissions are set such that vault token is not leaked to the world.
+
+Additional optional environment variables that control cache.
+
+**TOKEN_CACHE_REFRESH_THRESHOLD** - How long before the token expiration should it be regenerated (in seconds). Default is 300 seconds.
+
+**TOKEN_CACHE_KEY_NAME** - The object name to store. Default value is _token-cache_.
+
+**TOKEN_CACHE_CTX_TIMEOUT** - This value is in seconds. Default value is 30 seconds.
+
+**TOKEN_CACHE_STORAGE_REDIS_DB** - Database for Redis. Default is 0.
+
+**TOKEN_CACHE_REFRESH_RANDOM_OFFSET** - Random refresh offset in seconds to avoid all the instances refreshing at once. Default is 1/2 the duration in seconds of the _TOKEN_CACHE_REFRESH_THRESHOLD_.
+
