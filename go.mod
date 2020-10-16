@@ -1,4 +1,4 @@
-module github.com/NYTimes/gcp-vault
+module github.com/alex-khordos/gcp-vault
 
 require (
 	github.com/cenkalti/backoff/v4 v4.0.0
