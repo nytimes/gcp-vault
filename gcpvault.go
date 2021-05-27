@@ -1,9 +1,11 @@
 package gcpvault
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -398,6 +400,7 @@ func newJWT(ctx context.Context, cfg Config) (string, error) {
 
 	err = backoff.Retry(func() error {
 		jwt, err = newJWTBase(ctx, cfg)
+		println("retry")
 		return err
 	}, backoff.WithMaxRetries(b, uint64(cfg.MaxRetries)))
 
@@ -410,7 +413,7 @@ func newJWT(ctx context.Context, cfg Config) (string, error) {
 
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
 func newJWTBase(ctx context.Context, cfg Config) (string, error) {
-	serviceAccount, project, tokenSource, err := getServiceAccountInfo(ctx, cfg)
+	serviceAccount, _, tokenSource, err := getServiceAccountInfo(ctx, cfg)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get service account from environment")
 	}
@@ -433,23 +436,32 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 			Base:   hc.Transport,
 		},
 	}
-	iamClient, err := iam.New(hcIAM)
-	if err != nil {
-		return "", errors.Wrap(err, "unable to init IAM client")
-	}
+
+	gcpURL := "https://iam.googleapis.com/v1"
 
 	if cfg.IAMAddress != "" {
-		iamClient.BasePath = cfg.IAMAddress
+		gcpURL = cfg.IAMAddress
 	}
 
-	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
-		fmt.Sprintf("projects/%s/serviceAccounts/%s",
-			project, serviceAccount),
-		&iam.SignJwtRequest{Payload: string(payload)}).Context(ctx).Do()
+	resp, err := hcIAM.Post(fmt.Sprintf(gcpURL+"/projects/-/serviceAccounts/%s:signJwt", serviceAccount), "application/json", bytes.NewBuffer(payload))
+	//println(resp.StatusCode)
+	if err != nil || resp.StatusCode != 200 {
+		return "", errors.Wrap(err, "unable to sign JWT")
+	}
+	body, readErr := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if readErr != nil {
+		return "", errors.Wrap(err, "unable to parse response")
+	}
+	var data map[string]interface{}
+	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to sign JWT")
 	}
-	return resp.SignedJwt, nil
+	jwt := fmt.Sprint(data["signedJwt"])
+
+	println("jwt: " + jwt)
+	return jwt, nil
 }
 
 var findDefaultCredentials = google.FindDefaultCredentials
