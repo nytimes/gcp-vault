@@ -1,9 +1,11 @@
 package gcpvault
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -14,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/iam/v1"
 )
 
 // Config contains fields for configuring access and secrets retrieval from a Vault
@@ -127,7 +128,7 @@ func GetSecrets(ctx context.Context, cfg Config) (map[string]interface{}, error)
 
 	vClient, err := login(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to login to vault")
+		return nil, errors.Wrap(err, "unable to login to vault ")
 	}
 
 	// fetch secrets
@@ -410,18 +411,9 @@ func newJWT(ctx context.Context, cfg Config) (string, error) {
 
 // created JWT should match https://www.vaultproject.io/docs/auth/gcp.html#the-iam-authentication-token
 func newJWTBase(ctx context.Context, cfg Config) (string, error) {
-	serviceAccount, project, tokenSource, err := getServiceAccountInfo(ctx, cfg)
+	serviceAccount, tokenSource, err := getServiceAccountInfo(ctx, cfg)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get service account from environment")
-	}
-
-	payload, err := json.Marshal(map[string]interface{}{
-		"aud": "vault/" + cfg.Role,
-		"sub": serviceAccount,
-		"exp": time.Now().UTC().Add(5 * time.Minute).Unix(),
-	})
-	if err != nil {
-		return "", errors.Wrap(err, "unable to encode JWT payload")
 	}
 
 	hc := getHTTPClient(ctx, cfg)
@@ -433,46 +425,71 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 			Base:   hc.Transport,
 		},
 	}
-	iamClient, err := iam.New(hcIAM)
+
+	claim, err := json.Marshal(map[string]interface{}{
+		"aud": "vault/" + cfg.Role,
+		"sub": serviceAccount,
+		"exp": time.Now().UTC().Add(5 * time.Minute).Unix(),
+	})
+
 	if err != nil {
-		return "", errors.Wrap(err, "unable to init IAM client")
+		return "", errors.Wrap(err, "unable to encode JWT payload")
 	}
 
+	gcpURL := "https://iamcredentials.googleapis.com/v1"
 	if cfg.IAMAddress != "" {
-		iamClient.BasePath = cfg.IAMAddress
+		gcpURL = cfg.IAMAddress
 	}
 
-	resp, err := iamClient.Projects.ServiceAccounts.SignJwt(
-		fmt.Sprintf("projects/%s/serviceAccounts/%s",
-			project, serviceAccount),
-		&iam.SignJwtRequest{Payload: string(payload)}).Context(ctx).Do()
+	payload, err := json.Marshal(string(claim))
+	if err != nil {
+		return "", errors.Wrap(err, "unable to encode JWT payload")
+	}
+	body := []byte("{\"payload\":" + string(payload) + "}")
+	url := fmt.Sprintf(gcpURL+"/projects/-/serviceAccounts/%s:signJwt", serviceAccount)
+
+	resp, err := hcIAM.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return "", errors.Wrap(err, "unable to POST")
+	}
+
+	defer resp.Body.Close()
+
+	body, readErr := ioutil.ReadAll(resp.Body)
+	if readErr != nil {
+		return "", errors.Wrap(err, "unable to parse response")
+	}
+
+	var data map[string]string
+	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to sign JWT")
 	}
-	return resp.SignedJwt, nil
+
+	return data["signedJwt"], nil
 }
 
 var findDefaultCredentials = google.FindDefaultCredentials
 
-func getServiceAccountInfo(ctx context.Context, cfg Config) (string, string, oauth2.TokenSource, error) {
-	creds, err := findDefaultCredentials(ctx, iam.CloudPlatformScope)
+func getServiceAccountInfo(ctx context.Context, cfg Config) (string, oauth2.TokenSource, error) {
+	creds, err := findDefaultCredentials(ctx, `https://www.googleapis.com/auth/cloud-platform`)
 	if err != nil {
-		return "", "", nil, errors.Wrap(err, "unable to find credentials to sign JWT")
+		return "", nil, errors.Wrap(err, "unable to find credentials to sign JWT")
 	}
 
 	serviceAccountEmail, err := getEmailFromCredentials(creds)
 	if err != nil {
-		return "", "", nil, errors.Wrap(err, "unable to get email from given credentials")
+		return "", nil, errors.Wrap(err, "unable to get email from given credentials")
 	}
 
 	if serviceAccountEmail == "" {
 		serviceAccountEmail, err = getDefaultServiceAccountEmail(ctx, cfg)
 		if err != nil {
-			return "", "", nil, err
+			return "", nil, err
 		}
 	}
 
-	return serviceAccountEmail, creds.ProjectID, creds.TokenSource, nil
+	return serviceAccountEmail, creds.TokenSource, nil
 }
 
 func getEmailFromCredentials(creds *google.Credentials) (string, error) {
