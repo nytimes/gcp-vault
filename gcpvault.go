@@ -97,6 +97,7 @@ const (
 	TokenCacheRefreshRandomOffsetDefault = 60
 	TokenCacheKeyNameDefault             = "token-cache"
 	TokenCacheMaxRetriesDefault          = 3
+	CloudScope                           = "https://www.googleapis.com/auth/cloud-platform"
 )
 
 // GetSecrets will use GCP Auth to access any secrets under the given SecretPath in
@@ -472,7 +473,7 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 var findDefaultCredentials = google.FindDefaultCredentials
 
 func getServiceAccountInfo(ctx context.Context, cfg Config) (string, oauth2.TokenSource, error) {
-	creds, err := findDefaultCredentials(ctx, `https://www.googleapis.com/auth/cloud-platform`)
+	creds, err := findDefaultCredentials(ctx, CloudScope)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to find credentials to sign JWT")
 	}
