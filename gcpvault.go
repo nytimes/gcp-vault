@@ -440,7 +440,7 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 	if cfg.IAMAddress != "" {
 		gcpURL = cfg.IAMAddress
 	}
-
+	// this additional marshalling is to escape the json
 	payload, err := json.Marshal(string(claim))
 	if err != nil {
 		return "", errors.Wrap(err, "unable to encode JWT payload")
