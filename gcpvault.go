@@ -446,18 +446,18 @@ func newJWTBase(ctx context.Context, cfg Config) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "unable to encode JWT payload")
 	}
-	body := []byte("{\"payload\":" + string(payload) + "}")
+	reqBody := []byte("{\"payload\":" + string(payload) + "}")
 	url := fmt.Sprintf(gcpURL+"/projects/-/serviceAccounts/%s:signJwt", serviceAccount)
 
-	resp, err := hcIAM.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := hcIAM.Post(url, "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return "", errors.Wrap(err, "unable to POST")
 	}
 
 	defer resp.Body.Close()
 
-	body, readErr := ioutil.ReadAll(resp.Body)
-	if readErr != nil {
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
 		return "", errors.Wrap(err, "unable to parse response")
 	}
 
