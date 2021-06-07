@@ -42,4 +42,3 @@ Additional optional environment variables that control cache.
 **TOKEN_CACHE_STORAGE_REDIS_DB** - Database for Redis. Default is 0.
 
 **TOKEN_CACHE_REFRESH_RANDOM_OFFSET** - Random refresh offset in seconds to avoid all the instances refreshing at once. Default is 1/2 the duration in seconds of the _TOKEN_CACHE_REFRESH_THRESHOLD_.
-

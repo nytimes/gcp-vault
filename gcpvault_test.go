@@ -238,8 +238,8 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-		  "client_secret": "abcd",  "refresh_token": "blah",
-		"client_email": "",  "type": "service_account"}`),
+			  "client_secret": "abcd",  "refresh_token": "blah",
+			"client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:       true,
@@ -268,8 +268,8 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-		  "client_secret": "abcd",  "refresh_token": "blah",
-		"client_email": "",  "type": "service_account"}`),
+			  "client_secret": "abcd",  "refresh_token": "blah",
+			"client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:       true,
@@ -299,8 +299,8 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-	  "client_secret": "abcd",  "refresh_token": "blah",
-  "client_email": "",  "type": "service_account"}`),
+		  "client_secret": "abcd",  "refresh_token": "blah",
+		"client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:       true,
@@ -330,8 +330,8 @@ func TestGetSecrets(t *testing.T) {
 				ProjectID:   "test-project",
 				TokenSource: testTokenSource{},
 				JSON: []byte(`{  "client_id": "1234.apps.googleusercontent.com",
-	  "client_secret": "abcd",  "refresh_token": "blah",
-  "client_email": "",  "type": "service_account"}`),
+		  "client_secret": "abcd",  "refresh_token": "blah",
+		"client_email": "",  "type": "service_account"}`),
 			},
 
 			wantVaultRead:       true,
@@ -390,7 +390,6 @@ func TestGetSecrets(t *testing.T) {
 				if test.wantIAMRetry {
 					test.wantIAMRetry = false
 					w.WriteHeader(http.StatusBadGateway)
-					return
 				}
 				gotIAMHit = true
 				json.NewEncoder(w).Encode(iam.SignJwtResponse{
