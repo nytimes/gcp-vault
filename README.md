@@ -22,7 +22,7 @@ For mocking out the services required for interacting with Vault, a [gcpvaulttes
 
 Check out the [examples](https://github.com/NYTimes/gcp-vault/tree/master/examples/) directory for examples on how to use this package.
 
-#Vault Token Caching
+# Vault Token Caching
 
 The library has an option to enable Vault Token Caching. Currently, Redis or GCS is supported for token storage. To enable token caching,
 one the following environment variables should set:
