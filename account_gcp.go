@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/vault/api"
 	"github.com/pkg/errors"
 )
 
@@ -59,9 +60,11 @@ func getHTTPClient(ctx context.Context, cfg Config) *http.Client {
 	if cfg.HTTPClient != nil {
 		return cfg.HTTPClient
 	}
-	return &http.Client{
-		Transport: &http.Transport{
-			IdleConnTimeout: 1 * time.Second,
-		},
+
+	// start with Vault's http client and also configure an idle connection timeout
+	c := api.DefaultConfig().HttpClient
+	c.Transport = &http.Transport{
+		IdleConnTimeout: 1 * time.Second,
 	}
+	return c
 }
