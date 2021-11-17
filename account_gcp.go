@@ -63,8 +63,6 @@ func getHTTPClient(ctx context.Context, cfg Config) *http.Client {
 
 	// start with Vault's http client and also configure an idle connection timeout
 	c := api.DefaultConfig().HttpClient
-	c.Transport = &http.Transport{
-		IdleConnTimeout: 1 * time.Second,
-	}
+	c.Transport.(*http.Transport).IdleConnTimeout = 1 * time.Second
 	return c
 }
