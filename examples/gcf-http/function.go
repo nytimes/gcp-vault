@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	gcpvault "github.com/NYTimes/gcp-vault"
-	"github.com/NYTimes/gcp-vault/examples/nyt"
 	"github.com/kelseyhightower/envconfig"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 )
 
 func init() {

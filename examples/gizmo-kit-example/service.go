@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"os"
 
-	gcpvault "github.com/NYTimes/gcp-vault"
-	"github.com/NYTimes/gcp-vault/examples/nyt"
 	"github.com/NYTimes/gizmo/server/kit"
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )

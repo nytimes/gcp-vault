@@ -1,11 +1,11 @@
-module github.com/NYTimes/gcp-vault/examples
+module github.com/nytimes/gcp-vault/examples
 
 go 1.12
 
-replace github.com/NYTimes/gcp-vault => ../
+replace github.com/nytimes/gcp-vault => ../
 
 require (
-	github.com/NYTimes/gcp-vault v0.2.2
+	github.com/nytimes/gcp-vault v0.2.2
 	github.com/NYTimes/gizmo v0.4.3
 	github.com/NYTimes/marvin v0.2.1
 	github.com/go-kit/kit v0.8.0

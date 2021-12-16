@@ -7,14 +7,15 @@ import (
 	"net/http"
 	"sync"
 
-	gcpvault "github.com/NYTimes/gcp-vault"
-	"github.com/NYTimes/gcp-vault/examples/nyt"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/urlfetch"
+
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 )
 
 func main() {

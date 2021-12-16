@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/NYTimes/gcp-vault/examples/nyt"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 )

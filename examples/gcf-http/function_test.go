@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/NYTimes/gcp-vault/examples/nyt"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 )
 
 func TestTopStories(t *testing.T) {

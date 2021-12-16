@@ -46,8 +46,8 @@ github.com/DataDog/datadog-go v0.0.0-20180822151419-281ae9f2d895/go.mod h1:LButx
 github.com/Jeffail/gabs v1.1.0/go.mod h1:6xMvQMK4k33lb7GUUpaAPh6nKMmemQeg5d4gn7/bOXc=
 github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/Microsoft/go-winio v0.4.11/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcyvVC4A4RozmA=
-github.com/NYTimes/gcp-vault v0.2.2 h1:Nib/JBuQunwGC1kzrtoeEPQHoc4wAhK1ssezyT13A2k=
-github.com/NYTimes/gcp-vault v0.2.2/go.mod h1:CSWqyXfr6y86rjoYw4SGAZyGC16OVVXNfOIPKuFk3K8=
+github.com/nytimes/gcp-vault v0.2.2 h1:Nib/JBuQunwGC1kzrtoeEPQHoc4wAhK1ssezyT13A2k=
+github.com/nytimes/gcp-vault v0.2.2/go.mod h1:CSWqyXfr6y86rjoYw4SGAZyGC16OVVXNfOIPKuFk3K8=
 github.com/NYTimes/gizmo v0.2.0/go.mod h1:tLR/IQtD07ThHGvVJunAMq2i8WoxPLadvfo33fkvp5A=
 github.com/NYTimes/gizmo v0.4.3 h1:s7n/7x9DpPEdDsDKCXqcoAnhQ+YEria17DmuFvyvJKs=
 github.com/NYTimes/gizmo v0.4.3/go.mod h1:N50DpJFBsOEAKpyz5np34XOLWw+O+RJtYvbGlUPCqCo=

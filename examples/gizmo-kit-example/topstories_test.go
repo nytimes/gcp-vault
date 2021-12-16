@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NYTimes/gcp-vault/examples/nyt"
 	"github.com/NYTimes/gizmo/server/kit"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 )
 
 func TestTopStories(t *testing.T) {

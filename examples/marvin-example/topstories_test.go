@@ -11,9 +11,9 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 
-	gcpvault "github.com/NYTimes/gcp-vault"
-	"github.com/NYTimes/gcp-vault/gcpvaulttest"
 	"github.com/NYTimes/marvin"
+	gcpvault "github.com/nytimes/gcp-vault"
+	"github.com/nytimes/gcp-vault/gcpvaulttest"
 )
 
 func TestTopStories(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/NYTimes/gcp-vault/examples/nyt"
 	"github.com/NYTimes/marvin"
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/nytimes/gcp-vault/examples/nyt"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/urlfetch"
 )

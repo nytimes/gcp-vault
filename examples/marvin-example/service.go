@@ -8,11 +8,11 @@ import (
 
 	"google.golang.org/appengine/log"
 
-	gcpvault "github.com/NYTimes/gcp-vault"
 	"github.com/NYTimes/marvin"
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/kelseyhightower/envconfig"
+	gcpvault "github.com/nytimes/gcp-vault"
 	"github.com/pkg/errors"
 )
 

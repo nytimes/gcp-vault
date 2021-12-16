@@ -5,7 +5,7 @@ import (
 
 	"github.com/NYTimes/gizmo/server/kit"
 
-	gizmoexample "github.com/NYTimes/gcp-vault/examples/gizmo-kit-example"
+	gizmoexample "github.com/nytimes/gcp-vault/examples/gizmo-kit-example"
 )
 
 func main() {
