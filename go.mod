@@ -7,7 +7,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/vault/api v1.0.3
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.9.1
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5
 	google.golang.org/api v0.40.0
 	google.golang.org/appengine v1.6.7
