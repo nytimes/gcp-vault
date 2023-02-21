@@ -12,7 +12,7 @@ workspace:
 
 steps:
 - name: mod-download
-  image: golang:1
+  image: golang:1.19
   commands:
   - go mod download
   environment:
@@ -21,7 +21,7 @@ steps:
   - clone
 
 - name: test
-  image: golang:1
+  image: golang:1.19
   commands:
   - go test -race -vet all -mod readonly ./...
   depends_on:
