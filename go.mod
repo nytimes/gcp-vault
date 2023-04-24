@@ -5,7 +5,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/gomodule/redigo v1.8.9
 	github.com/google/go-cmp v0.5.9
-	github.com/hashicorp/vault/api v1.9.0
+	github.com/hashicorp/vault/api v1.9.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/oauth2 v0.7.0
@@ -37,7 +37,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/crypto v0.5.0 // indirect
+	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
