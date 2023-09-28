@@ -10,7 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	golang.org/x/oauth2 v0.12.0
 	google.golang.org/api v0.142.0
-	google.golang.org/appengine v1.6.7
+	google.golang.org/appengine v1.6.8
 )
 
 require (
