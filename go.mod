@@ -4,7 +4,7 @@ require (
 	cloud.google.com/go/storage v1.33.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gomodule/redigo v1.8.9
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/vault/api v1.10.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
