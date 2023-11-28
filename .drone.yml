@@ -1,5 +1,6 @@
 ---
 kind: pipeline
+type: docker
 name: build_go
 
 platform:
@@ -11,18 +12,10 @@ workspace:
   path: gcp-vault
 
 steps:
-- name: mod-download
-  image: golang:1.12
-  commands:
-  - go mod download
-  environment:
-    GOPROXY: https://proxy.golang.org
-  depends_on:
-  - clone
-
-- name: test
-  image: golang:1.12
-  commands:
-  - go test -race -vet all -mod readonly ./...
-  depends_on:
-  - mod-download
+  - name: test
+    image: golang:1.19
+    commands:
+      - go test -race -v ./... -covermode=atomic .
+    when:
+      event:
+        - push
