@@ -1,6 +1,6 @@
 # gcpvault
 
-[![GoDoc](https://godoc.org/github.com/NYTimes/gcp-vault?status.svg)](https://godoc.org/github.com/NYTimes/gcp-vault) [![Build Status](https://cloud.drone.io/api/badges/nytimes/gcp-vault/status.svg)](https://cloud.drone.io/nytimes/gcp-vault)
+[![GoDoc](https://godoc.org/github.com/NYTimes/gcp-vault?status.svg)](https://godoc.org/github.com/NYTimes/gcp-vault) [![Build Status](https://drone.dv.nyt.net/api/badges/nytimes/gcp-vault/status.svg)](https://drone.dv.nyt.net/nytimes/gcp-vault)
 
 `gcpvault` provides a function for securely retrieving secrets from [HashiCorp Vault](https://www.vaultproject.io/) while running on the [Google Cloud Platform](https://cloud.google.com/) or in your local development environment.
 
