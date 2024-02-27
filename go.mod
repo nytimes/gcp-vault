@@ -3,7 +3,7 @@ module github.com/NYTimes/gcp-vault
 require (
 	cloud.google.com/go/storage v1.38.0
 	github.com/cenkalti/backoff/v4 v4.2.1
-	github.com/gomodule/redigo v1.8.9
+	github.com/gomodule/redigo v1.9.2
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/vault/api v1.12.0
 	github.com/kelseyhightower/envconfig v1.4.0
