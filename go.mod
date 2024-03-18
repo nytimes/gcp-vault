@@ -9,7 +9,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/oauth2 v0.18.0
-	google.golang.org/api v0.169.0
+	google.golang.org/api v0.170.0
 	google.golang.org/appengine v1.6.8
 )
 
@@ -55,9 +55,9 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240304161311-37d4d3c04a78 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240304161311-37d4d3c04a78 // indirect
-	google.golang.org/grpc v1.62.0 // indirect
-	google.golang.org/protobuf v1.32.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240311132316-a219d84964c2 // indirect
+	google.golang.org/grpc v1.62.1 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 )
 
 go 1.19
