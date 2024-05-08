@@ -1,7 +1,7 @@
 module github.com/NYTimes/gcp-vault
 
 require (
-	cloud.google.com/go/storage v1.39.1
+	cloud.google.com/go/storage v1.40.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gomodule/redigo v1.9.2
 	github.com/google/go-cmp v0.6.0
@@ -18,7 +18,7 @@ require (
 	cloud.google.com/go/auth v0.3.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	cloud.google.com/go/iam v1.1.6 // indirect
+	cloud.google.com/go/iam v1.1.7 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
