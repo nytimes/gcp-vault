@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/vault/api v1.12.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/pkg/errors v0.9.1
-	golang.org/x/oauth2 v0.19.0
+	golang.org/x/oauth2 v0.20.0
 	google.golang.org/api v0.177.0
 	google.golang.org/appengine v1.6.8
 )
